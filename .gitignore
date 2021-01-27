@@ -4,4 +4,4 @@
 .Ruserdata
 scratch.R
 data/*.gpkg
-images/*.png
+images/fig_sitemap.png

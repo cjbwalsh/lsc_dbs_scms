@@ -1,5 +1,15 @@
-#Instructions for building a postgreSQL database from the data files in github.com/cjbwalsh/lsc_dbs_scms/data
-#These instructions work on Linux and Mac OSX. Not sure about Windows.
+# This file contains code and instructions for building a postgreSQL database from the 
+# tables in the Open Science Framework repository https://osf.io/57azq/ (Walsh et al. 2021) 
+# and its associated github repository https://github.com/cjbwalsh/lsc_dbs_scms.
+# These instructions should work on Linux and Mac OSX (not tested on Windows), 
+# if the github repository has been cloned to the working computer,
+# followed by running the following line from the lsc_dbs_scms directory
+## source("load_ld_scms_tables.R").
+# See load_ld_scms_tables.R for instructions on cloning the github repository.
+
+# Walsh, C. J., Burns, M. J., Fletcher, T. D., Bos, D. G., Kunapo, J., Poelsma, P., & Imberger, S. J. (2021), 
+# Linking stormwater control performance to stream ecosystem outcomes: incorporating performance metrics into 
+# effective imperviousness/Data and code, Open Science Framework. https://osf.io/57azq
 
 #To install postgreSQL on a Mac, use the installer at https://www.postgresql.org/download/macosx/
 #Be sure to add the spatial extension PostGIS

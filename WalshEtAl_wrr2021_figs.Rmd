@@ -14,9 +14,9 @@ bibliography: references.bib
 
 ### Figure captions  
 
-Fig. 1.  Examples of stream ecosystem response variables as a function of effective imperviousness (EI) as piecewise regressions (solid black line with 95% confidence intervals in the grey polygon as derived by Walsh et al., 2005a), compared to a linear regression against log$_{10}$(EI + 0.001), solid red line with dotted 95% confidence limits. a) Median filterable reactive phosphorus (FRP) concentrations and b) SIGNAL score (a biotic index). Five overlapping points in a) are shown by slight jittering.
+Fig. 1.  Examples of stream ecosystem response variables as a function of effective imperviousness (EI) as piecewise regressions (solid black line with 95% confidence intervals in the grey polygon as derived by @walsh_etal_2005a, compared to a linear regression against log$_{10}$(EI + 0.001), solid red line with dotted 95% confidence limits. a) Median filterable reactive phosphorus (FRP) concentrations and b) SIGNAL score (a biotic index). Five overlapping points in a) are shown by slight jittering.
 
-Fig. 2.  The 11 streamflow-gauging sites considered in this paper and their catchments, coloured by their status as control, experimental or reference. The 7 primary catchments of the original experiment are italicized, and the site and catchment of flow gauges in two stormwater pipes (Wicks and Heath) are shown. Impervious areas in each catchment are shaded by their connection to the stormwater drainage system. (Impervious areas outside catchments are not shown.)  Inset maps show the location of the main map (black rectangle) in Victoria, Australia.  
+Fig. 2.  The 11 streamflow-gauging sites considered in this paper and their catchments, coloured by their status as control, experimental or reference. The 7 primary catchments of the original experiment are italicized. Impervious areas in each catchment are shaded by their connection to the stormwater drainage system. (Impervious areas outside catchments are not shown.)  Inset maps show the location of the main map (grey rectangle) in Victoria, Australia.  
 
 Fig. 3. Runoff depth following rainfall events in study streams (A–C, E–H, J–L) and two stormwater pipes (D, I), estimated from mapped impervious areas, rainfall and specifications of stormwater control measures (x-axes) plotted against runoff depth as measured by flow gauges.  Events are coloured by season (wet, dry and shoulder).  The dotted black line shows the 1:1 relationship and the yellow dashed line shows the line of best fit for events arising from <20 mm of rain. (Events from >20 mm of rain are plotted in fainter hues)  
 
@@ -39,50 +39,7 @@ source(here("code","download.OSF.file.R"))
 source(here("code","BACRIfunctions.R"))  
 knitr::opts_chunk$set(echo = FALSE, dev = "png", dpi = 200)
 #Check all gpkg files have been downloaded to the data file, and download any that are missing.
-gpkg_files <- dir(here::here("data"))[grep("gpkg",dir(here::here("data")))]
-all_gpkgs <- c("Australia_GDA94_GCS.gpkg","catIA.gpkg","cats.gpkg","ia.gpkg",
-               "lsc_dbs_streams.gpkg","parcels.gpkg","scms.gpkg","siteLabels.gpkg",
-               "sites.gpkg","streams.gpkg","subcs.gpkg","Victoria_GDA94_GCS.gpkg")
-guids <- c("4pz5d","8rd3x","ahstz","hgeuv","yazpb","f9b2e",
-           "mgh6t","s7e5r","dscqz","jm563","rneqf","ps8wy")
-gpkg_files <- all_gpkgs[!all_gpkgs %in% gpkg_files]
-if(length(gpkg_files) > 0){
-  for(i in 1:length(gpkg_files))
-   download.OSF.file(GUID = guids[i],
-                     Access_Token = "https://osf.io/3um4v/?view_only=7392be708374475b98e5ebbf2f86855f",
-                     file_name = gpkg_files[i], subdir = "data")
-}
-load(here::here("data","db_non_sf.rda"))
-for(i in 1:length(all_gpkgs)){
-  temp <- sf::st_read(here::here("data",paste(all_gpkgs[i],sep = "")), 
-                               stringsAsFactors = FALSE, quiet = TRUE)
-  temp <- st_set_geometry(st_set_geometry(temp,NULL), st_geometry(temp)) # set geometry, return sf
-  assign(gsub(".gpkg","",all_gpkgs[i]),temp)
-}
-####
-SCMs <- scms; rm(scms)
-#add Little Stringybark and Dobsons impervious data to other catchments
-catIA <- rbind(ia, catIA[names(catIA) != "address"])
-#minor differences in sampling reaches over time and for different purposes, 
-#and minor changes in catchment boundaries with some SCMs.  Select original hydrology sites for map
-catMap11 <- cats[cats$hydrology == 1 & cats$origDrain == 1,]  
-#Hydrology sites, pre-the Entrance, including 2 pipe sites
-catMap11$col <- RColorBrewer::brewer.pal(3,"Dark2")[match(catMap11$treatment,c("R","E","C"))]
-catMap11$sitecode <- substr(as.vector(catMap11$sitecode),1,7)
-siteMap11 <- sites[sites$hydrology == 1,]
-siteMap11$sitecode <- substr(siteMap11$sitecode,1,7)
-siteMap11$col <- catMap11$col[match(siteMap11$sitecode, catMap11$sitecode)]
-siteMap11$col[is.na(siteMap11$col)] <- "black"
-catMap11$col[is.na(catMap11$col)] <- "black"
-siteLabels$font <- 1
-siteLabels$font[siteLabels$sitecode %in% as.vector(cats$sitecode[cats$core == 1])] <- 4
-siteLabels <- siteLabels[!siteLabels$siteLabel %in% c("WR","HE"),]
-#Fig.3 eventRainRunoff comparison...
-sites <- c("BRS0015", "FER0006","LIS0001","LSS0001","LSN0001",
-          "LIS0004","DBS0004","SAS0002", "LYR0007","OLN0009","DBS0008")  
-#use shorter names with internally logical names for the paper
-sites_p <- c("Br","Fe","L1","Ls","Ln","L4","D4","Sa","Ly","Ol","D8")
-siteLabels$sites_p <- sites_p[match(siteLabels$sitecode, sites)]
+source(here("load_ld_scms_tables.R"))
 ```
 
 ```{r frp_v_ei, warning=FALSE, message=FALSE, fig.width = 7.48, fig.height = 3.5}
@@ -180,7 +137,7 @@ plot(catIA$geometry[is.na(catIA$constructionDate) |
      border = c(gray(0.6),gray(0.85),gray(0.85))[match(catIA$conn,c(1,0,0.5))],
      lwd = 0.5, add = TRUE)
 #col converts conn = 0.5 to 0 (those surfaces that would be connected if the pits weren't full)..
-#only really applies in Wicks
+#only applies in Wicks subcatchment
 plot(streams$geometry, col = "dodgerblue", lwd = 2, add = TRUE)
 plot(catMap11$geometry, lty = 3, lwd = 2, border = catMap11$col, add = TRUE)
 plot(siteMap11$geometry, pch = 21, bg = siteMap11$col, cex = 1.1, add = TRUE)

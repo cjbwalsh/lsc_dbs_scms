@@ -1,4 +1,13 @@
-#See ../lsc_foundation/build_postgres_scmdb_from_mysql.R for source code for the postgres database lsc_dbs_scms
+# This script records the compilation of tables stored at https://osf.io/57azq/ (Walsh et al. 2021)
+# from the unimelb database lsc_dbs_scms.  The process primarily removes data fields
+# that are not relevant to Walsh et al. (2021).  The script will only run if connected to the unimelb network.
+
+# Walsh, C. J., Burns, M. J., Fletcher, T. D., Bos, D. G., Kunapo, J., Poelsma, P., & Imberger, S. J. (2021), 
+# Linking stormwater control performance to stream ecosystem outcomes: incorporating performance metrics into 
+# effective imperviousness/Data and code, Open Science Framework. https://osf.io/57azq
+
+#See https://github.com/cjbwalsh/lsc_foundation/build_postgres_scmdb_from_mysql.R for the source code 
+# that compiled the original lsc_dbs_scms postgres database 
 
 source("code/BACRIfunctions.R")  #also loads required packages
 

@@ -17,7 +17,8 @@ knitr::opts_chunk$set(echo = TRUE, dev = "pdf", message=FALSE) #,dpi = 200
 
 ## Introduction  
 
-S3 describes compilation of specification data for stormwater control measures (SCMs) implemented in the Little Stringybark Creek and Dobsons Creek catchments. The data was structured as a postgreSQL database. The database's constituent tables have been compiled into two files in the data directory of the github repository https://github.com/cjbwalsh/lsc_dbs_scms (db_non_sf.rda, containing the non-spatial tables, and db_sf.zip, containing the spatial tables each saved as a geopackage file), and the code in this document assumes it is running from a clone of that repository.  
+S3 describes compilation of specification data for stormwater control measures (SCMs) implemented in the Little Stringybark Creek and Dobsons Creek catchments. The data was structured as a postgreSQL database. The database's constituent tables are stored in an Open Science Framework repository (https://osf.io/57azq/). Spatial tables are stored in the spatial_data component of the repository, and non-spatial tables are stored in the linked data directory of the github repository https://github.com/cjbwalsh/lsc_dbs_scms.  
+and the code in this document assumes it is running from a clone of that repository.  
 
 The calculations were conducted in R using a series of functions in the file "code/BACRIfunctions.R".  The code chunk below loads BACRIfunctions.R and the data. It also includes commented-out code illustrating the method for reading the data from the database.
 
