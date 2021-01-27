@@ -43,11 +43,11 @@
 # postgres=# \list  #to check existing databases
 # postgres=# CREATE DATABASE ld_scms;
 # postgres=# \q
-# psql -d mwstr_dev -c "CREATE EXTENSION postgis;"
-# psql -d mwstr_dev -c "CREATE EXTENSION pg_trgm;"
-# psql -d mwstr_dev -c "CREATE EXTENSION fuzzystrmatch;"
-# psql -d mwstr_dev -c "GRANT SELECT ON ALL TABLES IN SCHEMA public TO readonly;"
-# psql -d mwstr_dev -c "ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT ON TABLES TO readonly;"
+# psql -d ld_scms -c "CREATE EXTENSION postgis;"
+# psql -d ld_scms -c "CREATE EXTENSION pg_trgm;"
+# psql -d ld_scms -c "CREATE EXTENSION fuzzystrmatch;"
+# psql -d ld_scms -c "GRANT SELECT ON ALL TABLES IN SCHEMA public TO readonly;"
+# psql -d ld_scms -c "ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT ON TABLES TO readonly;"
 
 # Read the tables from github.com/cjbwalsh/lsc_dbs_scms/data (assumes getwd = lsc_dbs_scms, cloned from github)
 load(here::here("data","db_non_sf.rda"))

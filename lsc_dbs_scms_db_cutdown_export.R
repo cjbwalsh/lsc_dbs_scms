@@ -57,7 +57,7 @@ sqlQuery(paste("SELECT s1.* FROM (SELECT streams.site, streams.strcode, streams.
                 streams.type,streams.geometry FROM streams) s1 JOIN (SELECT site FROM subcs WHERE 
                 site = ANY( SELECT UNNEST( allus || 71455) FROM subcs  WHERE site =  71455)) s2 ON (s1.site = s2.site);", 
       sep = ""), "mwstr_dev"))
-sf::st_write(streams,"data/streams.gpkg", delete_layer = TRUE)
+sf::st_write(streams,"data/lsc_dbs_streams.gpkg", delete_layer = TRUE)
 save(dds, filtprofs, metadata, parcelChanges, 
      raingardens, scmChanges, scmProjects, 
      scmsDecommissioned, tanks, file = "data/db_non_sf.rda", compress = "xz")
