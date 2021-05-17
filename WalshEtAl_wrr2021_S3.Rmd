@@ -20,28 +20,11 @@ knitr::opts_chunk$set(echo = TRUE, dev = "pdf", message=FALSE) #,dpi = 200
 S3 describes compilation of specification data for stormwater control measures (SCMs) implemented in the Little Stringybark Creek and Dobsons Creek catchments. The data was structured as a postgreSQL database. The database's constituent tables are stored in an Open Science Framework repository (https://osf.io/57azq/). Spatial tables are stored in the spatial_data component of the repository, and non-spatial tables are stored in the linked data directory of the github repository https://github.com/cjbwalsh/lsc_dbs_scms.  
 and the code in this document assumes it is running from a clone of that repository.  
 
-The calculations were conducted in R using a series of functions in the file "code/BACRIfunctions.R".  The code chunk below loads BACRIfunctions.R and the data. It also includes commented-out code illustrating the method for reading the data from the database.
+The calculations were conducted in R using a series of functions in the file "code/BACRIfunctions.R".  The code chunk below loads BACRIfunctions.R and the data. 
 
 ```{r load_data}
 source("code/BACRIfunctions.R")  #also loads required packages
-
-load(here::here("data","db_non_sf.rda"))
-
-#spatial tables needed to be saved as non-rda files lest they cause recursion problems...
-### Run this commented-out unzip command if db_sf.zip has not previously been unzipped 
-### in your local environment
-if(sum(grepl("gpkg",dir(here::here("data")))) == 0)
-unzip(here::here("data","db_sf.zip"))
-
-gpkg_files <- dir(here::here("data"))[grep("gpkg",dir(here::here("data")))]
-for(i in 1:length(gpkg_files)){
-  temp <- temp1 <- sf::st_read(here::here("data",paste(gpkg_files[i],sep = "")), 
-                               stringsAsFactors = FALSE, quiet = TRUE)
-  sf::st_geometry(temp) <- NULL
-  temp1 <- sf::st_sf(temp, geometry = temp1$geom)
-  assign(gsub(".gpkg","",gpkg_files[i]),temp1)
-}
-SCMs <- scms; rm(scms)
+source("load_ld_scms_tables.R")
 example_pipeID <- 29
 ```
 
@@ -49,14 +32,14 @@ example_pipeID <- 29
 
 Data detailing the specifications of all SCMs in the two catchments (Little Stringybark and Dobsons) were compiled into the postgreSQL database (Fig. S3-1). 
 
-Each catchment was divided at two scales: into (property and road) parcels, and into pipe subcatchments that permit calculation of impervious runoff and fluxes of waters into and out of SCMs at the property, pipe subcatchment and catchment scale. Specifications of tanks, raingardens and downpipe diverters permit modelling of individual SCMs and treatment trains of SCMs that drain to each other.  Dates of changes in impervious coverage, in installation, decommissioning and specifications of SCMs, permit calculation of time series of fluxes at all scales. [*Do we need to de-identify parcel addresses (and therefore remove parcelsMaps from the collection of files)? Also should data not used in the foundation paper (e.g. cost data) be held back?*].  
+Each catchment was divided at two scales: into (property and road) parcels, and into pipe subcatchments that permit calculation of impervious runoff and fluxes of waters into and out of SCMs at the property, pipe subcatchment and catchment scale. Specifications of tanks, raingardens and downpipe diverters permit modelling of individual SCMs and treatment trains of SCMs that drain to each other.  Dates of changes in impervious coverage, in installation, decommissioning and specifications of SCMs, permit calculation of time series of fluxes at all scales.
 
-![Fig. S3-1. Tables and their relationships in database of stormwater control measures in the Little Stringybark and Dobsons Creek catchments. Spatial tables can be identified by their geometry field.](images/lscdbsSCMsStructure_postgres.png) 
+![Fig. S2. Tables and their relationships in database of stormwater control measures in the Little Stringybark and Dobsons Creek catchments. Spatial tables can be identified by their geometry field.](images/ld_scms_ER_diagram.png) 
   
   
 The following description of the constituent tables explains the logic underlying the dataset and its use.  
   
-```{r fig1_pipeIDmap, echo = FALSE, warning=FALSE, message=FALSE, fig.width = 7, fig.height = 4}
+```{r figS3_pipeIDmap, echo = FALSE, warning=FALSE, message=FALSE, fig.width = 7, fig.height = 4}
 par(mar = c(0,0,0,0),mfrow = c(1,2))
 plot(subcs$geometry[subcs$pipeID < 100]) #LSC pipeIDs < 100, DBS pipe IDs > 100
 scCentroids <- sf::st_centroid(subcs$geometry[subcs$pipeID < 100])
@@ -82,21 +65,21 @@ text(sf::st_coordinates(scCentroids)[,1], sf::st_coordinates(scCentroids)[,2] - 
 title(main = "B. Dobsons Creek", adj = 0, line = -1, font.main = 1, cex.main = 0.8)
 ```
   
-#### Fig. S3-2. Maps of 'pipe' subcatchments used to partition the study catchments of A. Little Stringybark Creek (LSC) and B. Dobsons Creek. The pipeID of each subcatchment is indicated in black, and the next pipeID downstream is indicated in red, italic font. The locations of the 5 LSC and 3 DBS flow gauges used in the study are indicated as gray circles.  
+#### Fig. S3. Maps of 'pipe' subcatchments used to partition the study catchments of A. Little Stringybark Creek (LSC) and B. Dobsons Creek. The pipeID of each subcatchment is indicated in black, and the next pipeID downstream is indicated in red, italic font. The locations of the 5 LSC and 3 DBS flow gauges used in the study are indicated as gray circles.  
 
 ### Table subcs (pipe subcatchments)  
 
-The catchments of the two most downstream experimental sites (D8-e and L4-e) are divided into subcatchments (identified by unique pipeIDs, Fig. S3-2) that permit modelling of impervious runoff and SCM performance at a range of scales. Subcatchments were selected:  
+The catchments of the two most downstream experimental sites (D8 and L4) are divided into subcatchments (identified by unique pipeIDs, Fig. S3) that permit modelling of impervious runoff and SCM performance at a range of scales. Subcatchments were selected:  
 
-1. At the outlet of pipes which are (or potentially could be) intercepted by an SCM before entering the stream;  
+1. at the outlet of pipes which are (or potentially could be) intercepted by an SCM before entering the stream;  
 
-1. At segments along streams upstream of a pipe subcatchment outlet;  
+2. at segments along streams upstream of a pipe subcatchment outlet;  
 
-1. At the locations of sampling reaches or gauges.  
+3. at the locations of sampling reaches or gauges.  
 
-The field "pipeName" gives meaningful names to each pipeID either by a street name, or the name of an SCM or the code for a sampling site. The field "nextds" identifies the next pipeID downstream (see Fig. S3-2), allowing compilation of all upstream pipeIDs using the function allupstream(). "scarea" is the area of the subcatchment polygon in m^2^, and "carea" is the total upstream catchment area for each subcatchment (also in m^2^).  "trib" is the gauge site that the subcatchment lies in (i.e. L4-e, L1-e, LN-e, LS-E, D4-e or D8-e).  
+The field "pipeName" gives meaningful names to each pipeID either by a street name, or the name of an SCM or the code for a sampling site. The field "nextds" identifies the next pipeID downstream (see Fig. S3), allowing compilation of all upstream pipeIDs using the function allupstream(). "scarea" is the area of the subcatchment polygon in m^2^, and "carea" is the total upstream catchment area for each subcatchment (also in m^2^).  "trib" is the gauge site that the subcatchment lies in (i.e. L4, L1, Ln, Ls, D4 or D8).  
  
-```{r fig2_parcelMap, echo = FALSE, warning=FALSE, message=FALSE, fig.width = 7, fig.height = 4}
+```{r figS4_parcelMap, echo = FALSE, warning=FALSE, message=FALSE, fig.width = 7, fig.height = 4}
 par(mar = c(0,0,0,0),mfrow = c(1,2))
 plot(parcels$geometry[parcels$parcelType == "property" & parcels$pipeID < 100], border = "#fc8d62")
 plot(parcels$geometry[parcels$parcelType == "road" & parcels$pipeID < 100], border = "#66c2a5", add = TRUE)
@@ -109,19 +92,19 @@ suppressWarnings(plot(sf::st_intersection(streams, subcs)$geometry, col = "darkb
 title(main = "B. Dobsons Creek", adj = 0, line = -1, font.main = 1, cex.main = 0.8)
 ```
   
-#### Fig. S3-3. Maps of road (green) and property (orange) parcels of A. Little Stringybark Creek (LSC) and B. Dobsons Creek. .  
+#### Fig. S4. Maps of road (green) and property (orange) parcels of A. Little Stringybark Creek (LSC) and B. Dobsons Creek. .  
 
 ### Table parcels  
 
 The catchments of the two most downstream experimental sites were also divided into parcels:  
 
-- property parcels, obtained from the government cadastre (land.vic.gov.au), cut to the catchment boundaries of D8-e and L4-e using QGIS's intersect function. Some manual editing of the resulting property parcel layer was required to a) combine parcels on several properties that functioned as single properties, but were mapped as multiple titles, b) split several parcels that had been recently subdivided; and c) split any property parcels that spanned two pipe subcatchments and that had impervious areas that drained to different subcatchments. The last case was rare, and restricted to some larger properties: most properties had a single point of legal discharge to which stormwater runoff was required to drain.
+- property parcels, obtained from the government cadastre (land.vic.gov.au), cut to the catchment boundaries of D8 and L4 using the intersect function in QGIS. Some manual editing of the resulting property parcel layer was required to a) combine parcels on several properties that functioned as single properties, but were mapped as multiple titles, b) split several parcels that had been recently subdivided; and c) split any property parcels that spanned two pipe subcatchments and that had impervious areas that drained to different subcatchments. The last case was rare, and restricted to some larger properties: most properties had a single point of legal discharge to which stormwater runoff was required to drain.
 
-- road parcels, obtained using QGIS's difference function (between the property parcel and the catchment boundary layers) to identify the road reserves of each catchment, as the cadastre has gaps for road reserves. This extracted road reserve layer was manually split (using the split features tool) at intersections, and a unique parcelID was created for each newly created road parcel. 
+- road parcels, obtained using the difference function in QGIS (between the property parcel and the catchment boundary layers) to identify the road reserves of each catchment, as the cadastre has gaps for road reserves. This extracted road reserve layer was manually split (using the split features tool) at intersections, and a unique parcelID was created for each newly created road parcel. 
 
-Property and road parcels were combined into a single spatial layer for each catchment (Fig.  S3-3), and data associated with each parcel in the two layers were combined into the single table, 'parcels'.  *[Yet to decide which fields should be retained for public datasets.  We should probably remove address information, which will require some broader revision for the L4-e catchment because I use addresses as parcelIDs, and subsequently scmIDs.  Whether the JK estimates of imperviousness at the parcel scale are retained on whether they are used in the final manuscript - currently used in Fig. 6.  Currently the parcels table has the following fields: primary key "address" (other fields, nextds, pipeID [link to subcs], streetNo, streetSuff, streetName, streetType, parcelType [property or road], JKroofArea, JKpaveArea, roofAreaCon, roofAreaUncon, paveAreaCon, paveAreaUncon, parcelArea, parcelID, area_m2 and geometry [all areas in m^2^])]*  
+Property and road parcels were combined into a single spatial table, parcels (Fig. S4).   
   
-```{r fig3_iaMap, echo = FALSE, warning=FALSE, message=FALSE, dev = "png", dpi = 300, fig.width = 7, fig.height = 4}
+```{r figS5_iaMap, echo = FALSE, warning=FALSE, message=FALSE, dev = "png", dpi = 300, fig.width = 7, fig.height = 4}
 par(mar = c(0,0,0,0),mfrow = c(1,2))
 plot(cats$geometry[cats$sitecode %in% c("LIS0004H","LIS0001","LSN0001","LSS0001")])
 rect(par("usr")[1],par("usr")[3],par("usr")[2],par("usr")[4],col = gray(0.8),border = NA)
@@ -141,11 +124,11 @@ title(main = "B. Dobsons Creek", adj = 0, line = -1, font.main = 1, cex.main = 0
 legend("bottomright", pch = 15, col = RColorBrewer::brewer.pal(3,"YlOrBr"), legend = c(0,0.5,1), title = "Connected", cex = 0.8, bg = gray(0.8))
 ```
   
-#### Fig. S3-4. Maps of impervious areas of A. Little Stringybark Creek (LSC) and B. Dobsons Creek, coloured by drainage connection (see text).  
+#### Fig. S5. Maps of impervious areas of A. Little Stringybark Creek (LSC) and B. Dobsons Creek, coloured by drainage connection (see text).  
 
 ### Table ia (impervious surfaces)  
 
-Impervious polygons (see S1 for determination) were split by parcel and by pipe subcatchment to permit parcel-wise and sub-catchment-wise estimation of imperviousness. Each resulting polygon was given a unique polygon identifier (polyID), and a parcel identifier (address, matched to the parcels table) and a pipeID (matched to the subcs table).  The conn field denoted drainage connection, where conn = 1 for surfaces draining to sealed stormwater drainage, 0 for surfaces that are informally drained to land.  
+Impervious polygons (see S2 for determination) were split by parcel and by pipe subcatchment to permit parcel-wise and sub-catchment-wise estimation of imperviousness. Each resulting polygon was given a unique polygon identifier (polyID), a parcel identifier (address, matched to the parcels table) and a pipeID (matched to the subcs table).  The conn field denoted drainage connection, where conn = 1 for surfaces draining to sealed stormwater drainage, 0 for surfaces that are informally drained to land.  
 
 The field parcType indicates the type of parcel the surface lies in (property or road).  All surfaces in road parcels were paved, ground surfaces, while surfaces in property parcels could be either roof or paving.  For the LSC catchment, property surfaces were reliably classified as roof or ground paving (pave), and were classed as such in the surfType field.  In other catchments, the classification of roof and paving in properties was unreliable, and all property surfaces were classed as roof.
 

@@ -13,50 +13,82 @@ source(modfunctions)
 
 # Postgres helper functions ---------------------------------
 # # Minor datatabase management functions for lsc_dbs_scm database
-sqlQuery <- function (query,   #Syntactically correct SQL function
-                      db = "lsc_dbs_scms", # or "mwstr","mwstr_dev,"mwbugs" or "lsc" or...  
-                      type = "get", #send = dbSendQuery; get = dbGetQuery
-                      user = "readonly" # or "root" - the latter will only work on water-dev for admin users
-) {
+
+#' Connect to a database on water-dev (a unimelb server, administered by Chris Walsh)
+#' 
+#' @param db Database name, default "mwstr". Other available databases include
+#'      "mwbugs", "lsc_dbs_scms", and "lsc" (the last being a MySQL database)
+#' @param user User name: either "readonly", the default or "root". The latter
+#'      will only work if you have encrypted root credentials in your home 
+#'      directory
+#' @return a connection to the specified database
+#' @examples
+#'      mwstr_db <- connect_to_db()
+
+connect_to_db <- function(db, # or "mwbugs" or "lsc" or "lsc_dbs_scms", or ...  
+                          user = "readonly" # or "root" - the latter will only work on water-dev for admin users
+){
   # creating DB connection object with RPostgreSQL package
   hostname <- ifelse(Sys.info()["nodename"] == "water-dev.its.unimelb.edu.au",
                      "localhost", "water-dev.its.unimelb.edu.au")
-  if(db %in% c("lsc_dbs_scms","mwstr","mwbugs","mwstr_dev")){
-    drv <- DBI::dbDriver("PostgreSQL")
-  if(user == "readonly")
-    conn <- RPostgreSQL::dbConnect(drv, dbname = db,
+  if(db %in% c("lsc_dbs_scms","mwstr","mwbugs","mwstr_dev","sunbury","wetlandia","mwb","scratch")){
+    drv <- RPostgreSQL::PostgreSQL()
+    if(user == "readonly")
+      conn <- RPostgreSQL::dbConnect(drv, dbname = db,
                                      host = hostname, port = 5432,
                                      user = "readonly", password = "reachcode_42")  
-  if(user == "root")
-    conn <- RPostgreSQL::dbConnect(drv, dbname = "lsc_dbs_scms")
+    if(user == "root")
+      conn <- RPostgreSQL::dbConnect(drv, dbname = db)
   }
-if(db %in% c("lsc")){
-  if(user == "readonly")
-    #doesn't seem to be working for non localhost connections...
-    conn <- dbConnect(RMySQL::MySQL(), host = hostname, user = "readonly",
-                      password = "reachcode_42", dbname="lsc", port = 3306)
-  if(user == "root")  #Doesn't work if you don't have .my.cnf in your home directory
-    conn <- dbConnect(RMySQL::MySQL(),dbname="lsc", group='WERG')
+  if(db %in% c("lsc")){
+    if(user == "readonly")
+      conn <- dbConnect(RMySQL::MySQL(), host = "127.0.0.1", user = "readonly",
+                        password = "reachcode_42",dbname= db, port = 3306)
+    if(user == "root")  #Doesn't work if you don't have .my.cnf in your home directory
+      conn <- dbConnect(RMySQL::MySQL(), dbname = db)
+  }
+  conn
 }
+
+#' Apply an SQL query to a specified database
+#' 
+#' @param query A syntactically correct SQL query
+#' @param db Database name, default "mwstr". Other available databases include
+#'      "mwbugs", "lsc_dbs_scms", and "lsc" (the last being a MySQL database)
+#' @param type Either "get", the default, or "send".  Send queries alter the 
+#'      database and are only permitted if user = root
+#' @param user User name: either "readonly", the default or "root". The latter
+#'      will only work if you have encrypted root credentials in your home 
+#'      directory
+#' @return a connection to the specified database
+#' @examples
+#'    sqlQuery("SELECT * FROM stream_names WHERE str_nm = 'BASS RIVER';")
+
+sqlQuery <- function (query,   #Syntactically correct SQL
+                      db, # or "mwbugs" or "lsc" or "lsc_dbs_scms" ...  
+                      type = "get", #send = dbSendQuery; get = dbGetQuery
+                      user = "readonly" # or "root" - the latter will only work on water-dev for admin users
+) {
+  conn <- connect_to_db(db, user)
   # close db connection after function call exits
   on.exit(dbDisconnect(conn))
   # send Query to obtain result set
   if(type == "get"){
-    if(db %in% c("lsc_dbs_scms","mwstr","mwbugs","mwstr_dev")){
-    # but first, check if query concerns a spatial table
-    spatialtabs <- as.vector(t(dbGetQuery(conn, 
-                                          "select f_table_name from geometry_columns")))
-    spatialTRUE <- 0
-    for(i in 1:length(spatialtabs)){
-      if(grepl(paste("from",spatialtabs[i]), tolower(query)) & !grepl("scmsdecommissioned", tolower(query))) 
-        spatialTRUE <- spatialTRUE + 1
-    }
-    if(spatialTRUE == 0 | (spatialTRUE == 1 & !(grepl("SELECT [*]", query) | grepl("[*] FROM", query)))){
-      rs <- dbGetQuery(conn, query)
-    }
-    if(spatialTRUE == 1 & (grepl("SELECT [*]", query) | grepl("[*] FROM", query))){
-      rs <- sf::st_read(conn, query = query)
-    }
+    if(db %in% c("lsc_dbs_scms","mwstr","mwbugs","mwstr_dev","sunbury","wetlandia","mwb","scratch")){
+      # but first, check if query concerns a spatial table
+      spatialtabs <- as.vector(t(dbGetQuery(conn, 
+                                            "select f_table_name from geometry_columns")))
+      spatialTRUE <- 0
+      for(i in 1:length(spatialtabs)){
+        if(grepl(paste("from",spatialtabs[i]), tolower(query)) & !grepl("scmsdecommissioned", tolower(query))) 
+          spatialTRUE <- spatialTRUE + 1
+      }
+      if(spatialTRUE == 0){
+        rs <- dbGetQuery(conn, query)
+      }
+      if(spatialTRUE > 0){
+        rs <- suppressWarnings(sf::st_read(conn, query = query))
+      }
     }else{
       rs <- dbGetQuery(conn, query)
     }
@@ -359,7 +391,7 @@ data_on_datex <- function(pipeID, datex){
       polyi$parcType <- polyi$parcelType
       polyi$constructionDate <- pcx$date[i]
       polyi$surfType <- "roof" #almost always true. not important for ei calcs
-      polyi <- polyi[c("polyID","address","pipeID","conn","nextds","area_m2",
+      polyi <- polyi[c("polyID","pipeID","conn","nextds","area_m2",
                        "parcType","surfType","constructionDate","parcelID")] #see above if... #,"geometry")]
       iax <- rbind(iax, polyi)
     }
@@ -439,7 +471,7 @@ data_on_datex <- function(pipeID, datex){
     raingardensx$impCarea[raingardensx$scmID == "RPNR502"] <- sum((iax$area_m2*iax$conn)[!is.na(iax$nextds) & iax$nextds == "RPNR502"])
     #5c. If there are any public SCMs that capture all pipeID impervious runoff
     #upstream, then adjust their catchment areas to account for SCMs upstream
-    PLs <- scmProjects[is.na(scmProjects$address),]
+    PLs <- scmProjects[is.na(scmProjects$parcelID),]
     PLs <- PLs[!PLs$projectID %in% c("PL-8-Pembroke (Morrisons Reserve)",
                                      "PL-24-Petrol Station"),]
     # 3 PLs with SCM receiving all pipeID runoff not the most upstream SCM
@@ -504,7 +536,7 @@ data_on_datex <- function(pipeID, datex){
 
 data_for_scm <- function(scmID, fin_date = "2019-12-31"){
   #1. PL scms
-  PLs <- scmProjects[is.na(scmProjects$address) | scmProjects$address == "33-35 MONBULK ROAD",]
+  PLs <- scmProjects[is.na(scmProjects$parcelID) | scmProjects$parcelID == 2882,] #address == "33-35 MONBULK ROAD" (Mt Evelyn Primary School)
   scmi <- SCMs[SCMs$scmID == scmID,]
   if(scmi$projectID %in% PLs$projectID){
     allusi <- allupstream(subcs, scmi$pipeID, "pipeID")
@@ -529,7 +561,7 @@ data_for_scm <- function(scmID, fin_date = "2019-12-31"){
       allusi <- allupstream(SCMs, scmi$scmID, "scmID")
       SCMsx <- SCMs[SCMs$scmID %in% allusi,]
       scmProjectsx <- scmProjects[scmProjects$projectID %in% SCMsx$projectID,]
-      parcelsx <- parcels[parcels$address %in% SCMsx$address,]
+      parcelsx <- parcels[parcels$parcelID %in% SCMsx$parcelID,]
       iax <- ia[ia$parcelID %in% parcelsx$parcelID,]
       pcx <- parcels[0,] #for non-PLs, parcel changes irrelevant...
       scx <- scmChanges[scmChanges$scmID %in% SCMsx$scmID & scmChanges$changeDate < fin_date,]
@@ -573,7 +605,7 @@ ia_ts <- function(pipeID,
   fin_date <- lubridate::ymd(fin_date)
   db <- data_on_datex(pipeID, fin_date) 
   change_dates <- c(db$ia$constructionDate[!is.na(db$ia$constructionDate)],
-                    parcelChanges$date[parcelChanges$address %in% db$parcels$address])
+                    parcelChanges$date[parcelChanges$parcelID %in% db$parcels$parcelID])
   if(pipeID %in% c(30,31,52) &
      #Network change resulting from King St upper
      fin_date >= "2016-10-14" & start_date <= "2019-06-02"){ #periods of on-off for King St Upper
@@ -581,13 +613,13 @@ ia_ts <- function(pipeID,
                       "2018-02-05","2019-06-02")))
     db1 <- data_on_datex(pipeID, "2019-06-01") #last date King St upper was operational
     change_dates <- c(change_dates, db1$ia$constructionDate[!is.na(db1$ia$constructionDate)],
-                      parcelChanges$date[parcelChanges$address %in% db1$parcels$address])
+                      parcelChanges$date[parcelChanges$parcelID %in% db1$parcels$parcelID])
   }
   if(pipeID %in% c(36,61) & start_date >= "2015-12-04"){
     #Network change resulting from The Entrance RG
     db1 <- data_on_datex(pipeID, "2015-12-05") #installDate for The Entrance RG
     change_dates <- c(change_dates, db1$ia$constructionDate[!is.na(db1$ia$constructionDate)],
-                      parcelChanges$date[parcelChanges$address %in% db1$parcels$address])
+                      parcelChanges$date[parcelChanges$parcelID %in% db1$parcels$parcelID])
   }
   change_dates <- unique(change_dates)
   change_dates <- change_dates[change_dates >= start_date & change_dates < fin_date]
@@ -1546,9 +1578,10 @@ EB_subc_on_datex <- function(pipeID, datex,
   eia_sRO <- eia_s + sum(x$EB_max*(1- x$RO/x$EB_max))*100 # ia draining to an SCM, W = RO
   eia_sVR <- eia_s + sum(x$EB_max*(1- x$VR/x$EB_max))*100 # ia draining to an SCM, W = VR
   eia_sFV <- eia_s + sum(x$EB_max*(1- x$FV/x$EB_max))*100 # ia draining to an SCM, W = FV
+  eia_sWQ <- eia_s + sum(x$EB_max*(1- x$WQ/x$EB_max))*100 # ia draining to an SCM, W = VR
   eia_sEB <- eia_s + sum(x$EB_max*(1- x$EB/x$EB_max))*100 # ia draining to an SCM, W = EB
   }else{
-    eia_s <- eia_sRO <- eia_sVR <- eia_sFV <- eia_sEB <- eia
+    eia_s <- eia_sRO <- eia_sVR <- eia_sFV <- eia_sWQ <- eia_sEB <- eia
   }
   TI <- tia/carea
   EI <- eia/carea
@@ -1556,10 +1589,11 @@ EB_subc_on_datex <- function(pipeID, datex,
   EI_sRO <- eia_sRO/carea
   EI_sVR <- eia_sVR/carea
   EI_sFV <- eia_sFV/carea
+  EI_sWQ <- eia_sWQ/carea
   EI_sEB <- eia_sEB/carea
   if(dim(terminal_scms)[1] == 0) x <- NA
   list(scm_stats = x, TI = TI, EI = EI, EI_s = EI_s, EI_sRO = EI_sRO,
-       EI_sVR = EI_sVR, EI_sFV = EI_sFV, EI_sEB = EI_sEB)
+       EI_sVR = EI_sVR, EI_sFV = EI_sFV, EI_sWQ = EI_sWQ, EI_sEB = EI_sEB)
 }
   
 # EB_scm_time_series() ---------------------------------
@@ -1613,14 +1647,14 @@ EB_scm_time_series <- function(scmID, start_date, fin_date){
         for(i in 1:length(change_dates)) {
      db <- data_on_datex(pipeID, change_dates[i] + days(1))
      #PL SCMs of PL projects encompass all upstream impervious surfaces
-     if(!is.na(scmProjects$address[scmProjects$projectID == 
+     if(!is.na(scmProjects$parcelID[scmProjects$projectID == 
                                   SCMs$projectID[SCMs$scmID == scmID]])){
        us_scms <- allupstream(SCMs, scmID, "scmID")
        db$SCMs <- db$SCMs[db$SCMs$scmID %in% us_scms,]
        db$subcs <- db$subcs[db$subcs$pipeID %in% db$SCMs$pipeID,]
        db$scmProjects <- db$scmProjects[db$scmProjects$projectID %in% db$SCMs$projectID,]
-       db$parcels <- db$parcels[db$parcels$address %in% unique(db$SCMs$address),]
-       db$ia <- db$ia[db$ia$address %in% db$parcels$address,]
+       db$parcels <- db$parcels[db$parcels$parcelID %in% unique(db$SCMs$parcelID),]
+       db$ia <- db$ia[db$ia$parcelID %in% db$parcels$parcelID,]
      }
      if(i == 1)
      EBs <- t(unlist(EB_scm_on_datex(scmID, db = db)))
@@ -1742,7 +1776,7 @@ if(length(non_term_dates$date[j]) != sum(scmsDecommissioned$scmID == non_term_da
   # db <- data_on_datex(pipeID, fin_date)
   # carea <- db$subcs$carea[db$subcs$pipeID == pipeID]
   iats <- ia_ts(pipeID, start_date = start_date, fin_date = fin_date)
-  iats$s <- iats$ro <- iats$vr <- iats$fv <- iats$eb <- iats$eia
+  iats$s <- iats$ro <- iats$vr <- iats$fv <- iats$wq <- iats$eb <- iats$eia
   for(i in 1:length(terminal_scms)){
     if(terminal_scms[i] %in% non_term_dates$scmID) {
       end <- non_term_dates$date[non_term_dates$scmID == terminal_scms[i]]
@@ -1753,11 +1787,11 @@ if(length(non_term_dates$date[j]) != sum(scmsDecommissioned$scmID == non_term_da
     EBi_dates <- unique(c(EBi$date, end))
     for(j in 1:(length(EBi_dates)-1)){
       iats[iats$date > EBi_dates[j] & iats$date <= EBi_dates[j + 1],
-           c("s","ro","vr","fv","eb")] <- 
+           c("s","ro","vr","fv","wq","eb")] <- 
         iats[iats$date > EBi_dates[j] & iats$date <= EBi_dates[j + 1],
-             c("s","ro","vr","fv","eb")] - 
+             c("s","ro","vr","fv","wq","eb")] - 
         EBi[rep(j,sum(iats$date > EBi_dates[j] & iats$date <= EBi_dates[j + 1])),
-            c("EB_max","RO","VR","FV","EB")] * 100
+            c("EB_max","RO","VR","FV","WQ","EB")] * 100
     }
     if(i == 1)
       EBs <- EBi
@@ -1780,18 +1814,18 @@ if(length(non_term_dates$date[j]) != sum(scmsDecommissioned$scmID == non_term_da
         EBi_dates <- unique(c(EBi$date, end))
         for(j in 1:(length(EBi_dates)-1)){
           iats[iats$date > EBi_dates[j] & iats$date <= EBi_dates[j + 1],
-               c("s","ro","vr","fv","eb")] <- 
+               c("s","ro","vr","fv","wq","eb")] <- 
             iats[iats$date > EBi_dates[j] & iats$date <= EBi_dates[j + 1],
-                 c("s","ro","vr","fv","eb")] - 
+                 c("s","ro","vr","fv","wq","eb")] - 
             EBi[rep(j,sum(iats$date > EBi_dates[j] & iats$date <= EBi_dates[j + 1])),
-                c("EB_max","RO","VR","FV","EB")] * 100
+                c("EB_max","RO","VR","FV","WQ","EB")] * 100
         }
       }
       EBs <- rbind(new_EBs,EBs)
       non_term_dates <- rbind(new_ntds, non_term_dates)
   }
   carea <- iats$carea
-  cols <- c("tia","eia","eb","fv","vr","ro","s")
+  cols <- c("tia","eia","eb","fv","wq","vr","ro","s")
   iats[, (cols) := lapply(.SD, function(x) x/carea), .SDcols = cols]
   names(iats)[3:4] <- c("ti","ei")
   list(EBs = EBs, iats = iats, non_term_dates = non_term_dates)
@@ -1853,14 +1887,14 @@ budget_scm_time_series <- function(scmID, runoffData){
   for(i in 1:(length(change_dates)-1)) {
      db <- data_on_datex(pipeID, change_dates[i] + days(1))
      #PL SCMs of PL projects encompass all upstream impervious surfaces
-     if(!is.na(scmProjects$address[scmProjects$projectID == 
+     if(!is.na(scmProjects$parcelID[scmProjects$projectID == 
                                   SCMs$projectID[SCMs$scmID == scmID]])){
       us_scms <- allupstream(SCMs, scmID, "scmID")
       db$SCMs <- db$SCMs[db$SCMs$scmID %in% us_scms,]
       db$subcs <- db$subcs[db$subcs$pipeID %in% db$SCMs$pipeID,]
       db$scmProjects <- db$scmProjects[db$scmProjects$projectID %in% db$SCMs$projectID,]
-      db$parcels <- db$parcels[db$parcels$address %in% unique(db$SCMs$address),]
-      db$ia <- db$ia[db$ia$address %in% db$parcels$address,]
+      db$parcels <- db$parcels[db$parcels$parcelID %in% unique(db$SCMs$parcelID),]
+      db$ia <- db$ia[db$ia$parcelID %in% db$parcels$parcelID,]
      }
      if(i == 1){
       begin_store <- data.frame(scmID = db$SCMs$scmID, store = 0)
@@ -2264,8 +2298,8 @@ extract_ei <- function(sample_data, #must have fields samplecode, sitecode and d
   
   #Load and compile EI change data from lsc_foundation repository 
   # (calculated using data_preparation.R in that repository)
-  if(sum(c("ti", "ei", "eb", "fv", "vr", "ro", "s") %in% names(sample_data)) > 1)
-    stop(call. = FALSE, "sample_data already contains EI fields ('ti', 'eb', 'fv', 'vr', 'ro', or 's')")
+  if(sum(c("ti", "ei", "eb", "fv", "wq", "vr", "ro", "s") %in% names(sample_data)) > 1)
+    stop(call. = FALSE, "sample_data already contains EI fields ('ti', 'eb', 'fv', 'wq', 'vr', 'ro', or 's')")
   cats <- sqlQuery("SELECT * FROM cats WHERE sitecode IN 
                    ('SAS0002', 'LYR0007', 'OLN0009','BRS0015','FER0006','DBS0004',
                    'DBS0008', 'LIS0004H', 'LIS0001','LSS0001','LSN0001');",  
@@ -2276,7 +2310,7 @@ extract_ei <- function(sample_data, #must have fields samplecode, sitecode and d
   ei_data <- data.table::data.table(sqlQuery("SELECT * FROM Treatments;", db = "lsc"))
   ei_data$date <- as.Date(ei_data$date)
   ref <- ei_data[ei_data$date == ref_date,]
-  ref <- cbind(ref[,.(sitecode,date)],log10(ref[,.(ti,ei,eb,fv,vr,ro,s)]*100 + 0.1))
+  ref <- cbind(ref[,.(sitecode,date)],log10(ref[,.(ti,ei,eb,fv,wq,vr,ro,s)]*100 + 0.1))
   #CW could not work out how to merge these two data tables correctly!
   sample_data <- data.frame(sample_data)
   ei_data <- data.frame(ei_data)
@@ -2292,6 +2326,7 @@ extract_ei <- function(sample_data, #must have fields samplecode, sitecode and d
   sample_data$lro <- log10(sample_data$ro*100 + 0.1)
   sample_data$lvr <- log10(sample_data$vr*100 + 0.1)
   sample_data$lfv <- log10(sample_data$fv*100 + 0.1)
+  sample_data$lwq <- log10(sample_data$wq*100 + 0.1)
   #delEIs
   sample_data$del_lei <- sample_data$lei - ref$ei[match(sample_data$sitecode,ref$sitecode)]
   sample_data$del_ls <- sample_data$ls - ref$s[match(sample_data$sitecode,ref$sitecode)]
@@ -2299,6 +2334,7 @@ extract_ei <- function(sample_data, #must have fields samplecode, sitecode and d
   sample_data$del_lro <- sample_data$lro - ref$ro[match(sample_data$sitecode,ref$sitecode)]
   sample_data$del_lvr <- sample_data$lvr - ref$vr[match(sample_data$sitecode,ref$sitecode)]
   sample_data$del_lfv <- sample_data$lfv - ref$fv[match(sample_data$sitecode,ref$sitecode)]
+  sample_data$del_lwq <- sample_data$lwq - ref$wq[match(sample_data$sitecode,ref$sitecode)]
   if(!is.na(dep_dates[1])){
     sample_data$nextds <- c(rep("LIS0004",3),"DBS0008")[match(sample_data$sitecode,c("LIS0001","LSS0001","LSN0001","DBS0004"))]
     #distances between sites in km, estimated from mwstr_v1.1 (see database mwstr)
@@ -2311,7 +2347,7 @@ extract_ei <- function(sample_data, #must have fields samplecode, sitecode and d
     dbs4 <- dbs4*cats$carea_m2[cats$sitecode == "DBS0004"]
     ei_103 <- ei_data[ei_data$sitecode == "DBS0008",]
     dep_date_index <- which(ei_103$iats$date %in% dep_dates)
-    for(col in c("ti","ei","eb","fv","vr","ro","s"))
+    for(col in c("ti","ei","eb","fv","wq","vr","ro","s"))
       set(ei_103, i = dep_date_index, j=col, 
           value=(dbs8[dep_date_index, ..col] - dbs4[dep_date_index, ..col])/(cats$carea_m2[cats$sitecode == "DBS0008"] - 
                                                                                cats$carea_m2[cats$sitecode == "DBS0004"])[dep_date_index])
@@ -2326,7 +2362,7 @@ extract_ei <- function(sample_data, #must have fields samplecode, sitecode and d
     lsn1 <- sample_data[sample_data$sitecode == "LSN0001",..cols]
     lsn1 <- lsn1*cats$carea_m2[cats$sitecode == "LSN0001"]
     ei_71 <- ei_data[ei_data$sitecode == "LIS0004",]
-    for(col in c("ti","ei","eb","fv","vr","ro","s")) 
+    for(col in c("ti","ei","eb","fv","wq","vr","ro","s")) 
       set(ei_71, i = dep_date_index, j=col, 
           value=(lis4[dep_date_index, ..col] - lis1[dep_date_index, ..col] - lss1[dep_date_index, ..col] - lsn1[dep_date_index, ..col])/
             (cats$carea_m2[cats$sitecode == "LIS0004"] - cats$carea_m2[cats$sitecode == "LIS0001"] - 
@@ -2363,7 +2399,7 @@ extract_ei <- function(sample_data, #must have fields samplecode, sitecode and d
     sample_data$lfv[sample_data$sitecode == "LIS0004"] <- log10(spa_data$fv[match(sample_data$date[sample_data$sitecode == "LIS0004"],
                                                                                   spa_data$date)]*100 + 0.1)
     
-    cols <- c("ti","ei","eb","fv","vr","ro","s")
+    cols <- c("ti","ei","eb","fv","wq","vr","ro","s")
     ref <- data.frame(ref)
     ref[ref$sitecode == "LIS0004", cols] <- log10(ei_71[ei_71$date == ref_date, cols]*100 + 0.1)
     ref[ref$sitecode == "DBS0008", cols] <- log10(ei_103[ei_103$date == ref_date,cols]*100 + 0.1)
@@ -2372,6 +2408,7 @@ extract_ei <- function(sample_data, #must have fields samplecode, sitecode and d
     sample_data$del_leb[sample_data$date %in% dep_date_index] <- sample_data$leb[sample_data$date %in% dep_date_index] - ref$eb[match(sample_data$sitecode,ref$sitecode)]
     sample_data$del_lro[sample_data$date %in% dep_date_index] <- sample_data$lro[sample_data$date %in% dep_date_index] - ref$ro[match(sample_data$sitecode,ref$sitecode)]
     sample_data$del_lfv[sample_data$date %in% dep_date_index] <- sample_data$lfv[sample_data$date %in% dep_date_index] - ref$fv[match(sample_data$sitecode,ref$sitecode)]
+    sample_data$del_lwq[sample_data$date %in% dep_date_index] <- sample_data$lwq[sample_data$date %in% dep_date_index] - ref$wq[match(sample_data$sitecode,ref$sitecode)]
   }
   list(sample_data = sample_data, ref_ei = ei_data[ei_data$date == ref_date,])
 }

@@ -1,6 +1,6 @@
 ---
-title: 'Linking Stormwater Control Performance to Stream Ecosystem Outcomes: Incorporating Performance Metrics into Effective Imperviousness'
-subtitle: 'Supplementary material S3: Stormwater control measure spatial database'
+title: 'Linking stormwater control performance to stream ecosystem outcomes: incorporating performance metrics into effective imperviousness'
+subtitle: 'Supplementary material S1 and S2'
 author: 'Christopher J. Walsh, Matthew J. Burns, Tim D. Fletcher, Darren G. Bos, Peter Poelsma, Joshphar Kunapo and Sam J. Imberger'
 date: 'School of Ecosystem and Forest Sciences, The University of Melbourne, 500 Yarra Boulevard, Burnley Victoria 3121, Australia '
 output:
@@ -11,9 +11,15 @@ csl: water-resources-research.csl
 bibliography: references.bib
 ---
 
+```{r load_data, include = FALSE}
+source("code/BACRIfunctions.R")  #also loads required packages
+source("load_ld_scms_tables.R")
+```
+
 ### S1. Derivation and Formulaton of the stream protection metric, P
 
-The stream protection metric, *P*, estimates the extent to which an SCM mimics the catchment hydrology and water quality of appropriate reference streams that support good ecological condition.  It is the mean of four sub-metrics of different aspects of hydrology that can be addressed through SCM design and that have been posited as the primary drivers of stream degradation by urban stormwater runoff (Fletcher et al., 2011; Walsh et al., 2015, 2016).  To calculate each sub-metric, a hydrologic index (*I*) for the impervious area draining to the SCM is modelled (using an average year of rainfall data, in this case 1965-1966) in three potential states:  
+The stream stormwater impact metric, *S*, estimates the extent to which an SCM approximates uncontrolled stormwater flows (at its maximum value, 1)
+and the extent to which it mimics the catchment hydrology and water quality of appropriate reference streams that support good ecological condition (at its minimum value, 0).  It is the mean of four sub-metrics of different aspects of hydrology that can be addressed through SCM design and that have been posited as the primary drivers of stream degradation by urban stormwater runoff [@fletcher_etal_2011; @walsh_etal_2015; @walsh_etal_2016a].  To calculate each sub-metric, a hydrologic index (*I*) for the impervious area draining to the SCM is modelled (using an average year of rainfall data, in this case 1965-1966) in three potential states:  
 
 - *u*: the impervious area conventionally drained with no SCM;  
 
@@ -21,73 +27,290 @@ The stream protection metric, *P*, estimates the extent to which an SCM mimics t
 
 - *n*: the area covered by impervious surfaces in its pre-urban state, inferred from the runoff behaviour of forested reference catchments  
 
-Within bounds described below, each sub-metric is the ratio of the divergence of *I* from the pre-urban state with the SCM in place and the divergence of *I* from the pre-urban state if the SCM was absent, thus scaling the effect of the SCM between worst (no stormwater control) and best (target or reference condition) case. Thus: 
+Within bounds described below, each sub-metric is the ratio of the divergence of *I* from the pre-urban state with the SCM in place and the divergence of *I* from the pre-urban state if the SCM was absent, thus scaling the effect of the SCM between best case (target or reference condition) and worst case (no stormwater control). Thus:
 
 
 $$
 \begin{aligned}
-P_I = \frac{I_m - I_n}{I_u - I_n}
+S_I = \frac{I_m - I_n}{I_u - I_n}
 \end{aligned}
 $$
-where $P_I$ is the sub-metric of P based on the hydrologic index I, and the three values of *I* denoted by subscripts for three potential states as described above.  Each of the four sub-metrics assess performance against a design objective:  
+where $S_I$ is the sub-metric of *S* based on the hydrologic index *I*, and the three values of *I* denoted by subscripts for three potential states as described above.  Each of the four sub-metrics assess performance against a design objective:  
 
-1. The runoff frequency sub-metric, $P_R$, assesses performance against a design objective to reduce the frequency and magnitude of polluted high flows from impervious surfaces by ensuring that SCMs had sufficient retention capacity to avoid overflow of untreated water in ∼95% of rain events (Walsh et al. 2009). We propose a slightly different calculation of $P_R$ from Walsh *et al.* (2009, 2015).  The original calculation counted overflow days binarily, so that an overflow of a small fraction of a rain event was treated equally to an overflow of an entire rain event.  The new formulation weights each overflow day by the proportion of impervious runoff captured by the SCM on that day.  
+1. The runoff frequency sub-metric, $S_R$, assesses performance against a design objective to reduce the frequency and magnitude of polluted high flows from impervious surfaces by ensuring that SCMs have sufficient retention capacity to avoid overflow of untreated water in ∼95% of rain events [@walsh_etal_2009]. We used a slightly different calculation of $S_R$ from Walsh *et al.* [-@walsh_etal_2009; -@walsh_etal_2015].  The original calculation counted overflow days binarily, so that an overflow of a small fraction of a rain event was treated equally to an overflow of an entire rain event.  The new formulation weights each overflow day by the proportion of impervious runoff captured by the SCM on that day.  
 
 $$
 \begin{aligned}
-P_{R} = max(\frac{R_m - R_n}{R_u - R_n}, 0)
+S_{R} = max(\frac{R_m - R_n}{R_u - R_n}, 0)
 \end{aligned}
 $$
-where *R* is the number of overflow days in an average year, with subscripts as described above.  $R_m$ was calculated as $\Sigma_i^n\frac{Vo_i}{Vu_i}$, where $Vo_i$ is the volume of overflow from the SCM on day *i*, and $Vu_i$ is the volume of impervious runoff generated by the impervious surfaces draining to the SCM on day *i*.  If the SCM overflows less frequently than the frequency of overland flow inferred for reference catchments, $P_R$ is zero.
+  
+where *S* is the number of overflow days in an average year, with subscripts as described above.  $S_m$ was calculated as $\Sigma_i^n\frac{Vo_i}{Vu_i}$, where $Vo_i$ is the volume of overflow from the SCM on day *i*, and $Vu_i$ is the volume of impervious runoff generated by the impervious surfaces draining to the SCM on day *i*.  If the SCM overflows less frequently than the frequency of overland flow inferred for reference catchments, $S_R$ is zero.
 
-2. The filtered flow volume sub-metric, $P_F$, assesses performance against a design objective to restore base flows lost by the construction of impervious surfaces (Hamel et al. 2013), calculated as:  
+2. The filtered flow volume sub-metric, $S_F$, assesses performance against a design objective to restore base flows lost by the construction of impervious surfaces [@hamel_etal_2013], calculated as:  
 
 $$
 \begin{aligned}
-if(F_m < F_{forest}), P_{F} = \frac{F_m}{F_{forest}}
-\end{aligned}
-$$
-$$
-\begin{aligned}
-if(F_m > F_{pasture}), P_{F} = min(\frac{F_m-F_{pasture}}{F_{forest}},1)
+if(F_m < F_{forest}),\:S_{F} = \frac{F_m}{F_{forest}}
 \end{aligned}
 $$
 $$
 \begin{aligned}
-else, P_{F} =  0 
+if(F_m > F_{pasture}),\:S_{F} = min(\frac{F_m-F_{pasture}}{F_{forest}},1)
+\end{aligned}
+$$
+$$
+\begin{aligned}
+else,\:S_{F} =  0 
 \end{aligned}
 $$
 
-Where $F_m$ is the filtered volume through the SCM, and $F_{pasture}$ and $F_{forest}$ are volumes inferred to be pre-urban baseflow volumes for pasture and forest land cover [@zhang_et_al_2001].  These equations do not include $F_u$, which is zero because impervious surfaces prevent infiltration.
+Where $F_m$ is the filtered volume through the SCM, and $F_{pasture}$ and $F_{forest}$ are volumes inferred to be pre-urban baseflow volumes for pasture and forest land cover [@zhang_etal_2001].  These equations do not include $F_u$, which is zero because impervious surfaces prevent infiltration.
 
-3. The water quality sub-metric, $P_W$, assesses performance against a design objective to ensure that median concentration of primary pollutants (Total P, TP; Total N, TN; and Total Suspended Solids, TSS) flowing out of the SCM meet appropriate water quality objectives for stream protection. It was calculated as the mean of three sub-sub-metrics, calculate for each pollutant as: 
+3. The water quality sub-metric, $S_W$, assesses performance against a design objective to ensure that median concentration of primary pollutants (Total P, TP; Total N, TN; and Total Suspended Solids, TSS) flowing out of the SCM meet appropriate water quality objectives for stream protection. It was calculated as the mean of three sub-sub-metrics, calculate for each pollutant as: 
 
 $$
 \begin{aligned}
-P_W = max(\frac{[X]_m - [X]_n}{[X]_u - [X]_n}),0) 
+S_W = max(\frac{[X]_m - [X]_n}{[X]_u - [X]_n}),0) 
 \end{aligned}
 $$
-where $[X]$ is the median concentration of TP, TN or TSS, with subscripts as described above. 
-$[X]_u$ is the median concentration in untreated urban stormwater as assumed by a standard stormwater model (MUSIC reference?: 0.35, 2.2 and 120 mg/L for TP, TN and TSS respectively).  $[X]_m$ is the median concentration of combined outflows and overflows from the SCM, assuming no treatment for overflows, and set reductions in median concentrations for filtration systems of differing specifications (https://urbanstreams.net/lsc/EBcalctech.html). $[X]_n$, target concentrations, were derived primarily from the median concentrations observed in reference streams [unpublished data?]:  
+where $[X]$ is the median concentration of total phosphorus (TP), total nitrogen (TN) or total suspended solids (TSS), with subscripts as described above. 
+$[X]_u$ is the median concentration in untreated urban stormwater as assumed by a standard stormwater model (MUSIC reference?: 0.35, 2.2 and 120 mg/L for TP, TN and TSS respectively).  $[X]_m$ is the median concentration of combined outflows and overflows from the SCM, assuming no treatment for overflows, and set reductions in median concentrations for filtration systems of differing specifications (https://urbanstreams.net/lsc/EBcalctech.html). $[X]_n$, target concentrations, were derived primarily from the median concentrations observed in reference streams (C J Walsh, unpublished data):  
  
 - 20 mg/L TSS;  
 
-- reference median 0.03 mg/L TP, but $[TP]_n$ was set at 0.05 mg/L, the minimum median concentration achievable by biofiltration systems [refs?];  
+- median concentration in reference streams was 0.03 mg/L TP, but $[TP]_n$ was set at 0.05 mg/L, the minimum median concentration achievable by biofiltration systems [refs?];  
 
-- reference median 0.8 mg/L TN, but $[TN]_n$ was set at 0.6 mg/L because reference sites in our study area are likely to have elevated TN concentrations, and 0.6 mg/L was achievable by biofiltration systems [refs?]).
+- median concentration in the reference stream with fewest septic tanks was 0.8 mg/L TN, but $[TN]_n$ was set at 0.6 mg/L because reference sites in our study area are likely to have elevated TN concentrations, and 0.6 mg/L was achievable by biofiltration systems [refs?]).
 
-4. The volume-reduction sub-metric, $P_V$, assesses performance against a design objective to ensure that total runoff volume approximates the volume of rain falling on the impervious area that would have become streamflow in its pre-urban state.  
+4. The volume-reduction sub-metric, $S_V$, assesses performance against a design objective to ensure that total runoff volume approximates the volume of rain falling on the impervious area that would have become streamflow in its pre-urban state.  
 
 
 $$
 \begin{aligned}
-P_V = max(\frac{V_m - V_n}{V_u - V_n}, 0)
+S_V = max(\frac{V_m - V_n}{V_u - V_n}, 0)
 \end{aligned}
 $$
-where *V* is the total runoff volume, and following the conventions above; *V*$_m$ is the volume of impervious runoff passing through the SCM that is likely to become streamflow (overflow, exfiltration, and any flow through an outlet pipe), *V*$_u$ is the total volume of impervious runoff, and V$_n$ is the volume estimated to become streamflow from an equivalent area in a forested catchment [@zhang_et_al_2001]. This objective is of least direct ecological importance, but we emphasize it because addressing the large increase in runoff volume was central to achieving the other objectives (Walsh et al. 2012). 
+where *V* is the total runoff volume, and following the conventions above; *V*$_m$ is the volume of impervious runoff passing through the SCM that is likely to become streamflow (overflow, exfiltration, and any flow through an outlet pipe), *V*$_u$ is the total volume of impervious runoff, and V$_n$ is the volume estimated to become streamflow from an equivalent area in a forested catchment [@zhang_etal_2001]. This objective is of least direct ecological importance, but we emphasize it because addressing the large increase in runoff volume was central to achieving the other objectives [@walsh_etal_2012]. 
 
-### S1. Derivation and Formulaton of the stream protection metric, P
-<!-- Note: the bulk of S2 was written directly in Word.  The sections in this rmd document need to be pasted into that document.   -->
+
+### S2. Methods for determining imperviousness in the 11 study catchments
+
+<!-- More detailed description of imperviousness determination and comparison with past estimates can be found in
+wergSpatial/Projects/LSC/experimentalData/treatmentEffectStats.Rmd (and its knitted pdf and docx versions). This 
+description is based on that document.-->
+
+```{r ei_ts}
+# #' Calculate time series of EI variants for the 6 experimental catchments
+# #' Indicative calculation times (total for all 6 catchments ~ ~2 h) was based 
+# #' on running on a computer with a 3.3 GHz processor, using Linux OS (Ubuntu 18.4)
+# system.time(ei_53 <- EI_subc_time_series(53)) #~14 min (pipeID 53 = Ln aka LSN0001)
+# system.time(ei_36 <- EI_subc_time_series(36)) #~28 min (pipeID 36 = Ls aka LSS0001)
+# system.time(ei_74 <- EI_subc_time_series(74)) #~2 min (pipeID 74 = L1 aka LIS0001)
+# system.time(ei_101 <- EI_subc_time_series(101)) #~9 min (pipeID 101 = D4 aka DBS0004)
+# system.time(ei_71 <- EI_subc_time_series(71)) # #48 min (upstream_scm results argument causes (unresolved) incorrect result)
+#                     #upstream_scm_results = list(ei_53,ei_36,ei_74))) #~4 min (pipeID 71 = L4 aka LIS0004)
+# system.time(ei_103 <- EI_subc_time_series(103)) #22 min
+#                                         # upstream_scm_results = list(ei_101))) #~9 min (pipeID 103 = D8 aka DBS0008)
+# save(ei_53,ei_36,ei_74,ei_101,ei_71,ei_103, file = "data/ei_ts.rda", compress = "xz")
+load(here("data","/ei_ts.rda"))
+
+#SAS0002
+sasIA <- catIA[catIA$sitecode == "SAS0002",]
+#Time between first and last nearmap images used to QA the data
+ndays <- as.numeric(ymd("2019-12-31"),ymd("2009-10-12"))
+#proportional growth in impervious area over that time
+sasGrowthProp <- ((sum(sasIA$area_m2) - sum(sasIA$area_m2[is.na(sasIA$constructionDate)]))/sum(sasIA$area_m2))
+#assume exponential growth: P(t) = P(0)e^rt, so r = ln(Pt/Po)/t
+sasTIGrowthRate <- log(sum(sasIA$area_m2)/sum(sasIA$area_m2[is.na(sasIA$constructionDate)]))/ndays
+sasEIGrowthRate <- log(sum(sasIA$area_m2[sasIA$conn == 1])/sum(sasIA$area_m2[is.na(sasIA$constructionDate) & sasIA$conn == 1]))/ndays  
+#actually only one new carpark since 2001..so leave it as a step.
+constructionDates <- sasIA[!is.na(sasIA$constructionDate),]
+constructionDates <- constructionDates[order(constructionDates$constructionDate),]
+sasts <- data.frame(date = ei_101$iats$date)
+sasts$ti <- tii <- sum(sasIA$area_m2[is.na(sasIA$constructionDate)])/cats$carea_m2[cats$sitecode== "SAS0002"]
+for(i in 1:length(constructionDates$constructionDate)){
+  sasts$ti[sasts$date >= constructionDates$constructionDate[i]] <- 
+    tii <- tii + constructionDates$area_m2[i]/cats$carea_m2[cats$sitecode== "SAS0002"]
+}
+ndays <- as.numeric(dmy("17-07-2009") - sasts$date[1])
+sasts$ti[sasts$date < "2009-07-17"] <- sasts$ti[sasts$date == "2009-07-17"]*exp(sasTIGrowthRate*seq(-ndays,-1,1))
+#there was no ei growth between 2009 and 2017.  There is a new carpark in Woodlands Ave (277 m2 built before 2009)....
+sasts$ei <- eii <- as.numeric(sum(sasIA$area_m2[sasIA$conn == 1])/cats$carea_m2[cats$sitecode== "SAS0002"])
+sasts$ei[sasts$date < constructionDates$constructionDate[constructionDates$conn == 1]] <- eii - 
+  as.numeric(constructionDates$area_m2[constructionDates$conn == 1])/as.numeric(cats$carea_m2[cats$sitecode== "SAS0002"])
+rc_ei_ts <- data.frame(sitecode = "SAS0002", sasts)
+
+#OLN0009
+#Correction factors for semi-automated impervious estimation
+##DBS catchment is similar to OLN and upper part of Ferny so assume similar 
+##level of error in those catchments.
+DBSparcels <- parcels[parcels$pipeID > 100,]
+DBSparcels$tiaJK <- DBSparcels$JKroofArea + DBSparcels$JKpaveArea
+DBSparcels$tia <- DBSparcels$roofAreaCon + DBSparcels$roofAreaUncon + DBSparcels$paveAreaCon + DBSparcels$paveAreaUncon
+jkUnderFactor <- sum(DBSparcels$tiaJK)/sum(DBSparcels$tia)
+jkPropUnderFactor <- sum(DBSparcels$tiaJK[DBSparcels$parcelType == "property"])/sum(DBSparcels$tia[DBSparcels$parcelType == "property"])
+jkRoadOverFactor <- sum(DBSparcels$tiaJK[DBSparcels$parcelType == "road"])/sum(DBSparcels$tia[DBSparcels$parcelType == "road"])
+
+olnIA <- catIA[catIA$sitecode == "OLN0009",]
+# apply correction factor to properties only.  Roads have been redrawn and corrected in this catchment.
+# # compare ia table and olnIA....
+olnTI2009 <- as.numeric((sum(olnIA$area_m2[is.na(olnIA$constructionDate) & 
+                                             olnIA$surfType != "road"])/jkPropUnderFactor + 
+                           sum(olnIA$area_m2[is.na(olnIA$constructionDate) & 
+                                               olnIA$surfType == "road"]))/cats$carea_m2[cats$sitecode == "OLN0009"])
+#cw corrected the connected impervious polygons, so no correction factor for ei
+olnEI2009 <- as.numeric(sum((olnIA$area_m2*olnIA$conn)[is.na(olnIA$constructionDate)])/(cats$carea_m2[cats$sitecode == "OLN0009"]))
+####to do: Need to cut JK ia for OLN and LYR yet
+#oln_JKTI_2009 <- sum(olnTIA_JK@data$Shape_Area)/cats$carea_m2[cats$sitecode== "OLN0009"]
+olnts <- data.frame(date = ei_101$iats$date)
+olnts$ti <- olnTI2009*exp(sasTIGrowthRate*as.numeric(ei_101$iats$date - dmy("17-07-2009")))
+#there was no ei growth over the study period in this catchment....
+olnts$ei <- olnEI2009
+rc_ei_ts <- rbind(rc_ei_ts, data.frame(sitecode = "OLN0009", olnts))
+
+#LYR0007
+lyrIA <- catIA[catIA$sitecode == "LYR0007",]
+lyrEI2009 <- sum(lyrIA$area_m2[lyrIA$conn == 1])/(cats$carea_m2[cats$sitecode== "LYR0007"])
+lyrTI2009 <- sum(lyrIA$area_m2[is.na(lyrIA$constructionDate)])/(cats$carea_m2[cats$sitecode== "LYR0007"])
+constructionDates <- lyrIA[!is.na(lyrIA$constructionDate),]
+constructionDates <- constructionDates[order(constructionDates$constructionDate),]
+lyrts <- data.frame(date = ei_101$iats$date)
+lyrts$ti <- tii <- sum(lyrIA$area_m2[is.na(lyrIA$constructionDate)])/cats$carea_m2[cats$sitecode== "LYR0007"]
+for(i in 1:length(constructionDates$constructionDate)){
+  lyrts$ti[lyrts$date >= constructionDates$constructionDate[i]] <- tii <- tii + constructionDates$area_m2[i]/cats$carea_m2[cats$sitecode== "LYR0007"]
+}
+
+#ei consistently zero, only one new building in the catchment in the last 20 years
+lyrts$ei <- eii <- as.numeric(sum(lyrIA$area_m2[lyrIA$conn == 1])/cats$carea_m2[cats$sitecode== "LYR0007"])
+lyrts$ei[lyrts$ei < constructionDates$constructionDate[constructionDates$conn == 1]] <- eii - 
+  as.numeric(constructionDates$area_m2[constructionDates$conn == 1]/cats$carea_m2[cats$sitecode== "LYR0007"])
+rc_ei_ts <- rbind(rc_ei_ts, data.frame(sitecode = "LYR0007", lyrts))
+
+#Control sites----
+##BRS0015
+#correction factor derived from QAQC of portions of Brushy Creek catchment
+# brsSubCat <- sf::st_read("~/uomShare/wergSpatial/Projects/LSC/foundationPaper/data/ESRI/BRS_QA/BrushyUpperCat.shp", quiet = FALSE)
+# brsTIA_JK <- sf::st_read("~/uomShare/wergSpatial/Projects/LSC/foundationPaper/data/ESRI/BRS_QA/BrushyTIA_JK.shp", quiet = FALSE)
+# brsTIA <- sf::st_read("~/uomShare/wergSpatial/Projects/LSC/foundationPaper/data/ESRI/BRS_QA/BrushyTIA_AL.shp", quiet = FALSE)
+# brsTIA_JK$area_m2 <- sf::st_area(brsTIA_JK)
+# brsTIA$area_m2 <- sf::st_area(brsTIA)
+# brsTIA$constructionDate <- lubridate::ymd(brsTIA$X.constDate)
+# brsTIA$constYear <- lubridate::decimal_date(brsTIA$constructionDate)
+# #calculate correction on those polygons not identified as new in QA
+# brsJKCorrection <- as.numeric(sum(brsTIA_JK$area_m2)/sum(brsTIA$area_m2[is.na(brsTIA$constYear)]))
+brsJKCorrection <- 0.9327931
+#Time between first and last nearmap images used to QA the data
+nyears <- lubridate::decimal_date(lubridate::ymd("2019-12-31")) - 
+  lubridate::decimal_date(lubridate::dmy("12-10-2009"))
+#assume exponential growth: P(t) = P(0)e^rt, so r = ln(Pt/Po)/t
+brsTIGrowthRate <- as.numeric(log(sum(brsTIA$area_m2)/
+                                    sum(brsTIA$area_m2[is.na(brsTIA$constructionDate)]))/nyears)
+#growth in the test area is likely to be ~150% higher than most parts of the catchment
+brsTIGrowthRate <- brsTIGrowthRate*0.67
+brs_IA_map <- catIA[catIA$sitecode == "BRS0015",]
+TI2009 <- sum(brs_IA_map$area_m2)/cats$carea_m2[cats$sitecode== "BRS0015"]
+#and my accompanying estimate of EI
+EI2009 <- sum(brs_IA_map$area_m2*brs_IA_map$conn*0.9)/cats$carea_m2[cats$sitecode== "BRS0015"]
+#estimate TI accounting for JKCorrection
+brs_TI_2009 <- as.numeric(TI2009/brsJKCorrection)
+#and subsequent corrected EI estimate
+brs_EI_2009 <- brs_TI_2009*EI2009/TI2009
+brsts <- data.frame(date = ei_101$iats$date)
+brsts$ti <-  brs_TI_2009*exp(brsTIGrowthRate*(lubridate::decimal_date(brsts$date) -  
+                                                lubridate::decimal_date(lubridate::dmy("17-07-2009"))))
+EIfactor <- EI2009/TI2009
+brsts$ei <- brsts$ti*EIfactor
+rc_ei_ts <- rbind(rc_ei_ts, data.frame(sitecode = "BRS0015", brsts))
+
+#FER0006
+ferIA <- catIA[catIA$sitecode == "FER0006",]
+ferCorrFactor <- mean(brsJKCorrection, jkUnderFactor)
+ferTI2009 <- sum(ferIA$area_m2[is.na(ferIA$constructionDate)])/(cats$carea_m2[cats$sitecode== "FER0006"]*ferCorrFactor)
+ferEI2009 <- sum(ferIA$area_m2[ferIA$conn == 1]*0.9)/(cats$carea_m2[cats$sitecode== "FER0006"]*ferCorrFactor)
+ferts <- data.frame(date = ei_101$iats$date)
+#growth in FER likely to be 0.5 of that in BRS
+ferts$ti <-  ferTI2009*exp(0.5*brsTIGrowthRate*as.numeric(
+  lubridate::decimal_date(ferts$date) -  lubridate::decimal_date(lubridate::dmy("17-07-2009"))))
+EIfactor <- ferEI2009/ferTI2009
+ferts$ei <- ferts$ti*EIfactor
+save(treatSeq, file = paste(data_dir, "compiled_R_objects/treatSeq.rda", sep = ""))
+rc_ei_ts <- rbind(rc_ei_ts, data.frame(sitecode = "FER0006", ferts))
+rc_ei_ts$sitecode <- as.vector(rc_ei_ts$sitecode)
+save(rc_ei_ts, file = "compiled_objects/rc_ei_ts.rda", compress= "xz")
+
+#' Prepare hourly_data (rainfall and runoff data) for LSC and DBS catchments
+#' Need to revisit this once initial loss paramters are settled upon.
+
+# lscRain6min <- sqlQuery("lsc","SELECT * FROM rainfall WHERE sitecode = 'LIS0004'")
+# dbsRain6min <- sqlQuery("lsc","SELECT * FROM rainfall WHERE sitecode = 'DBS0004'")
+# lscRain6min$dateTime <- ymd_hms(lscRain6min$dateTime, tz = "UTC")
+# dbsRain6min$dateTime <- ymd_hms(dbsRain6min$dateTime, tz = "UTC")
+# lscET6min <- sqlQuery("lsc","SELECT * FROM potET WHERE sitecode = 'LIS0004'")
+# dbsET6min <- sqlQuery("lsc","SELECT * FROM potET WHERE sitecode = 'DBS0004'")
+# lscET6min$dateTime <- ymd_hms(lscET6min$dateTime, tz = "UTC")
+# dbsET6min$dateTime <- ymd_hms(dbsET6min$dateTime, tz = "UTC")
+# commonStart <- lubridate::ymd_hms("2000-01-01 10:00:00", tz = "UTC")
+# commonFin <- lubridate::ymd_hms("2019-02-07 09:54:00", tz = "UTC")
+# lscET6min <- lscET6min[lscET6min$dateTime >=  commonStart & lscET6min$dateTime <= commonFin,]
+# dbsET6min <- dbsET6min[dbsET6min$dateTime >= commonStart & dbsET6min$dateTime <= commonFin,]
+# lscRain6min <- lscRain6min[lscRain6min$dateTime >= commonStart & lscRain6min$dateTime <= commonFin,]
+# dbsRain6min <- dbsRain6min[dbsRain6min$dateTime >= commonStart & dbsRain6min$dateTime <= commonFin,]
+# lscRain6min$ET <- lscET6min$Mpot_mm[match(lscRain6min$dateTime, lscET6min$dateTime)]
+# dbsRain6min$ET <- dbsET6min$Mpot_mm[match(dbsRain6min$dateTime, dbsET6min$dateTime)]
+# lscRain6min <- data.table::data.table(lscRain6min)
+# dbsRain6min <- data.table::data.table(dbsRain6min)
+# lscRain6min$hour <- floor_date(lscRain6min$dateTime,"hours")
+# dbsRain6min$hour <- floor_date(dbsRain6min$dateTime,"hours")
+# lsc_rain_hourly <- lscRain6min[, lapply(.SD, sum, na.rm=TRUE), by=hour, .SDcols=c("Rain_depth","ET") ]
+# dbs_rain_hourly <- dbsRain6min[, lapply(.SD, sum, na.rm=TRUE), by=hour, .SDcols=c("Rain_depth","ET") ]
+# names(lsc_rain_hourly) <- names(dbs_rain_hourly) <- c("datetime","rain_mm","et_mm")
+#save(lsc_rain_hourly, dbs_rain_hourly, file = here("data","lsc_dbs_rain_hourly.rda"), compress = "xz")
+# rm(lscRain6min,dbsRain6min,lscET6min,dbsET6min)
+
+#' Assuming the above extraction of data from the lsc database has been run...
+load(here("data","lsc_dbs_rain_hourly.rda"))
+lsc_rain_hourly$runoff_mm <- lose.init(lsc_rain_hourly$rain_mm,0.256,2)
+lsc_runoff <- prepare_runoff_data(lsc_rain_hourly) 
+dbs_rain_hourly$runoff_mm <- lose.init(dbs_rain_hourly$rain_mm,0.256,2)
+dbs_runoff <- prepare_runoff_data(dbs_rain_hourly)
+ 
+#' Calculate time series of water balance elements for the 6 experimental catchments over the 20-year study period
+#' Indicative calculation times (total for all 6 catchments ~2 h) was as for ei_ts above
+
+system.time(budget_53 <- budget_subc_time_series(pipeID = 53, runoffData = lsc_runoff)) # ~12 min
+system.time(budget_36 <- budget_subc_time_series(pipeID = 36, runoffData = lsc_runoff)) # ~22 min
+system.time(budget_74 <- budget_subc_time_series(pipeID = 74, runoffData = lsc_runoff)) # ~10 min
+system.time(budget_101 <- budget_subc_time_series(pipeID = 101, runoffData = dbs_runoff)) # ~12 min
+system.time(budget_71 <- budget_subc_time_series(pipeID = 71, runoffData = lsc_runoff)) # ~50 min
+system.time(budget_103 <- budget_subc_time_series(pipeID = 103, runoffData = dbs_runoff)) # ~20 min,
+save(budget_53,budget_36,budget_74,budget_101,budget_71,budget_103, file = "compiled_objects/budget_ts.rda", compress = "xz")
+
+#' Assuming the above budget_subc_time_series calculations have been run...
+load("compiled_objects/budget_ts.rda")
+lo <- layout(matrix(c(1,2,3,1,4,5,1,6,7,0,8,8),4,3,byrow = TRUE),widths = c(1,10,10),heights = c(10,10,10,1))
+par(mar = c(0,0,0,0))
+plot.new()
+title(ylab = "Impervious runoff (mm)", line = -1.5)
+par(mar = c(2,2,1,1))
+##daily inflow = hourly ei_scm_runoff
+with(budget_53$hourly[date > "2018-01-01"], plot(date, ei_runoff/carea, type = 'l')); 
+with(budget_53$hourly[date > "2018-01-01"], lines(date, ei_scm_runoff/carea, col = 'red')); title(main = "a) LSN0001", adj = 0)
+with(budget_36$hourly[date > "2018-01-01"], plot(date, ei_runoff/carea, type = 'l')); 
+with(budget_36$hourly[date > "2018-01-01"], lines(date, ei_scm_runoff/carea, col = 'red')); title(main = "b) LSS0001", adj = 0)
+with(budget_74$hourly[date > "2018-01-01"], plot(date, ei_runoff/carea, type = 'l')); 
+with(budget_74$hourly[date > "2018-01-01"], lines(date, ei_scm_runoff/carea, col = 'red'));  title(main = "c) LIS0001", adj = 0)
+with(budget_71$hourly[date > "2018-01-01"], plot(date, ei_runoff/carea, type = 'l')); 
+with(budget_71$hourly[date > "2018-01-01"], lines(date, ei_scm_runoff/carea, col = 'red')); title(main = "d) LIS0004", adj = 0)
+with(budget_101$hourly[date > "2018-01-01"], plot(date, ei_runoff/carea, type = 'l')); 
+with(budget_101$hourly[date > "2018-01-01"], lines(date, ei_scm_runoff/carea, col = 'red'));  title(main = "e) DBS0004", adj = 0)
+with(budget_103$hourly[date > "2018-01-01"], plot(date, ei_runoff/carea, type = 'l')); 
+with(budget_103$hourly[date > "2018-01-01"], lines(date, ei_scm_runoff/carea, col = 'red'));  title(main = "f) DBS0008", adj = 0)
+par(mar = c(0,0,0,0))
+plot.new()
+title(xlab = "Date", line = -1.5)
+
+```
 
 The data plotted in Fig. 1. has been saved as ESRI shapefiles (".../wergSpatial/Projects/LSC/experimentalData/ESRI") and as simple feature objects in '.rds' files (".../wergSpatial/Projects/LSC/experimentalData/sf"). The second code chunk in the Rmarkdown document used to build this document preserves the compilation of these files (commented-out) and uses the rds files to plot Figure 1.  The following notes also refer to some layers prepared by Grace-GIS that can be found on the WERG shared drive at ".../wergSpatial/MWRegion/Vectors".
 

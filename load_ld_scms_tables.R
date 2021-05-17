@@ -12,6 +12,7 @@
 # Linking stormwater control performance to stream ecosystem outcomes: incorporating performance metrics into 
 # effective imperviousness/Data and code, Open Science Framework. https://osf.io/57azq
 
+source("code/BACRIfunctions.R")
 #Check if all relevant spatial files have been downloaded: if not download them
 gpkg_files <- dir(here::here("data"))[grep("gpkg",dir(here::here("data")))]
 all_gpkgs <- c("Australia_GDA94_GCS.gpkg","catIA.gpkg","cats.gpkg","ia.gpkg",
@@ -28,14 +29,24 @@ if(length(gpkg_files) > 0){
                       file_name = gpkg_files[i], subdir = "data")
 }
 
-# load non-spatial files for the ld_scms database
-load(here::here("data","db_non_sf.rda"))
 for(i in 1:length(all_gpkgs)){
   temp <- sf::st_read(here::here("data",paste(all_gpkgs[i],sep = "")), 
                       stringsAsFactors = FALSE, quiet = TRUE)
-  temp <- st_set_geometry(st_set_geometry(temp,NULL), st_geometry(temp)) # set geometry, return sf
+  temp <- sf::st_set_geometry(sf::st_set_geometry(temp,NULL), sf::st_geometry(temp)) # set geometry, return sf
   assign(gsub(".gpkg","",all_gpkgs[i]),temp)
 }
+
+# load non-spatial files
+rda_files <-  dir(here::here("data"))[grep(".rda",dir(here::here("data")))]
+for(i in 1:length(rda_files)){
+  if(rda_files[i] == "Croydon_1966_hourly_rain_runoff_et.rda"){
+    Croydon <- prepare_runoff_data(get(load(here::here("data",rda_files[i]))))  
+  }else{
+    load(here::here("data",rda_files[i]))
+  }
+}
+# The following files (loaded above) are derived from the database tables using code in the Rmd files
+# ei_ts.rda - see derivation in ei_ts chunk of WalshEtAl_wrr2021_S1-2.Rmd
 
 #Tidy up some of the data ready for analysis and plotting
 SCMs <- scms; rm(scms)

@@ -110,11 +110,11 @@ RPostgreSQL::dbWriteTable(conn = scm_db, name = 'metadata', value = metadata, ro
 RPostgreSQL::dbWriteTable(conn = scm_db, name = 'parcelchanges', value = parcelChanges, row.names = FALSE)
 RPostgreSQL::dbWriteTable(conn = scm_db, name = 'raingardens', value = raingardens, row.names = FALSE)
 RPostgreSQL::dbWriteTable(conn = scm_db, name = 'scmchanges', value = scmChanges, row.names = FALSE)
-RPostgreSQL::dbGetQuery(scm_db, "ALTER TABLE scmchanges ALTER COLUMN \"changeDate\" TYPE DATE;")
+RPostgreSQL::dbSendQuery(scm_db, "ALTER TABLE scmchanges ALTER COLUMN \"changeDate\" TYPE DATE;")
 RPostgreSQL::dbWriteTable(conn = scm_db, name = 'scmprojects', value = scmProjects, row.names = FALSE)
-RPostgreSQL::dbGetQuery(scm_db, "ALTER TABLE scmprojects ALTER COLUMN \"installDate\" TYPE DATE;")
+RPostgreSQL::dbSendQuery(scm_db, "ALTER TABLE scmprojects ALTER COLUMN \"installDate\" TYPE DATE;")
 RPostgreSQL::dbWriteTable(conn = scm_db, name = 'scmsdecommissioned', value = scmsDecommissioned, row.names = FALSE)
-RPostgreSQL::dbGetQuery(scm_db, "ALTER TABLE scmsdecommissioned ALTER COLUMN \"decommDate\" TYPE DATE;")
+RPostgreSQL::dbSendQuery(scm_db, "ALTER TABLE scmsdecommissioned ALTER COLUMN \"decommDate\" TYPE DATE;")
 RPostgreSQL::dbWriteTable(conn = scm_db, name = 'tanks', value = tanks, row.names = FALSE)
 
 RPostgreSQL::dbSendQuery(scm_db, "ALTER TABLE scms ADD PRIMARY KEY (\"scmID\");")
@@ -150,5 +150,6 @@ RPostgreSQL::dbSendQuery(scm_db,
 RPostgreSQL::dbSendQuery(scm_db, "ALTER TABLE cats ADD PRIMARY KEY (\"sitecode\");")
 RPostgreSQL::dbSendQuery(scm_db, "CREATE UNIQUE INDEX CONCURRENTLY \"sitecode\" ON cats (\"sitecode\");")
 RPostgreSQL::dbSendQuery(scm_db, "ALTER TABLE sites ADD PRIMARY KEY (\"sitecode\");")
-RPostgreSQL::dbSendQuery(scm_db, 
-                         "ALTER TABLE cats ADD CONSTRAINT \"sitecode\" FOREIGN KEY (\"sitecode\") REFERENCES sites (\"sitecode\");")
+#sitecodes differ between cats and sites because catchment boundaries changed in cats, for the same site....
+# RPostgreSQL::dbSendQuery(scm_db, 
+#                          "ALTER TABLE cats ADD CONSTRAINT \"sitecode\" FOREIGN KEY (\"sitecode\") REFERENCES sites (\"sitecode\");")
