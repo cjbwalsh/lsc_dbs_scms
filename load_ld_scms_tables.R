@@ -2,9 +2,8 @@
 # repository https://osf.io/57azq/ (Walsh et al. 2021), into the working directory lsc_dbs_scms
 
 # The code requires that you have cloned the associated github repository https://github.com/cjbwalsh/lsc_dbs_scms
-# to your working computer.  To clone the repository with RStudio, follow the following steps. With a web browser, 
-# navigate to https://github.com/cjbwalsh/lsc_dbs_scms. On the right side of the screen, click the green 
-# "Clone or download" button. Click the Copy to clipboard icon to the right of the repository URL. 
+# to your working computer.  To clone the repository with RStudio, follow the following steps. 
+# Copy the following URL to your clipboard: https://github.com/cjbwalsh/lsc_dbs_scms
 # Open RStudio on your local computer. Click File, New Project, Version Control, Git. Paste the repository URL 
 # and enter TAB to move to the Project directory name field. Click Create Project.
 
