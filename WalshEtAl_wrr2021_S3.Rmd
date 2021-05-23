@@ -3,13 +3,11 @@ title: 'Linking Stormwater Control Performance to Stream Ecosystem Outcomes: Inc
 subtitle: 'Supplementary material S3: Stormwater control measure spatial database'
 author: 'Christopher J. Walsh, Matthew J. Burns, Tim D. Fletcher, Darren G. Bos, Peter Poelsma, Joshphar Kunapo and Sam J. Imberger'
 date: 'School of Ecosystem and Forest Sciences, The University of Melbourne, 500 Yarra Boulevard, Burnley Victoria 3121, Australia'
-output:
-  word_document:
-    reference_docx: myStyle.docx
-  pdf_document: default
+output: 
+  officedown::rdocx_document:
+     reference_docx: officedown_template.docx
 csl: water-resources-research.csl
 bibliography: references.bib
-always_allow_html: true
 ---
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE, dev = "pdf", message=FALSE) #,dpi = 200 
@@ -34,7 +32,13 @@ Data detailing the specifications of all SCMs in the two catchments (Little Stri
 
 Each catchment was divided at two scales: into (property and road) parcels, and into pipe subcatchments that permit calculation of impervious runoff and fluxes of waters into and out of SCMs at the property, pipe subcatchment and catchment scale. Specifications of tanks, raingardens and downpipe diverters permit modelling of individual SCMs and treatment trains of SCMs that drain to each other.  Dates of changes in impervious coverage, in installation, decommissioning and specifications of SCMs, permit calculation of time series of fluxes at all scales.
 
-![Fig. S2. Tables and their relationships in database of stormwater control measures in the Little Stringybark and Dobsons Creek catchments. Spatial tables can be identified by their geometry field.](images/ld_scms_ER_diagram.png) 
+```{r, include=TRUE, fig.align="center", echo=FALSE, fig.width=6.75, fig.height = 3.5}
+#fig_no <- 1
+#ER diagram generated in dBeaver, and printed to pdf (paper size Choukei 3 envelope).
+knitr::include_graphics("images/ld_scms_ER_diagram.pdf")
+```
+
+#### Fig. S2. Tables and their relationships in database of stormwater control measures in the Little Stringybark and Dobsons Creek catchments. Spatial tables can be identified by their geometry field.
   
   
 The following description of the constituent tables explains the logic underlying the dataset and its use.  
@@ -201,9 +205,12 @@ To model their performance, all diverters installed as part of a single project 
 tanksMetaData <- metadata[metadata$tab == "tanks",c("field","definition")]
 names(tanksMetaData) <- c("Field","Definition")
 row.names(tanksMetaData) <- NULL
-ft <- flextable::flextable(tanksMetaData)
-ft <- flextable::align(ft, align = "left")
-flextable::autofit(ft)
+ft <- flextable::regulartable(tanksMetaData)
+ft <- flextable::align(ft, align = "left", part = "all")
+ft <- flextable::valign(ft, valign = "top", part = "all")
+ft <- flextable::width(ft, width = dim(ft)$widths*6.25/(flextable::flextable_dim(ft)$widths))  #A4 wudth  with 2.5 cm 
+ft <- flextable::autofit(ft)
+ft
 ```
   
 ### Table raingardens  
@@ -214,9 +221,12 @@ flextable::autofit(ft)
 rgsMetaData <- metadata[metadata$tab == "raingardens",c("field","definition")]
 names(rgsMetaData) <- c("Field","Definition")
 row.names(rgsMetaData) <- NULL
-ft <- flextable::flextable(rgsMetaData)
-ft <- flextable::align(ft, align = "left")
-flextable::autofit(ft)
+ft <- flextable::regulartable(rgsMetaData)
+ft <- flextable::align(ft, align = "left", part = "all")
+ft <- flextable::valign(ft, valign = "top", part = "all")
+ft <- flextable::width(ft, width = dim(ft)$widths*6.25/(flextable::flextable_dim(ft)$widths))  #A4 wudth  with 2.5 cm 
+ft <- flextable::autofit(ft)
+ft
 ```
 
 ### Table scmChanges  
@@ -235,7 +245,7 @@ The substantial small-scale variability among the measured soil profiles made ac
 
 In the Dobsons Creek catchments, the mean filter profile from multiple hydraulic conductivity tests around the Wicks bioinfiltration system were used for all raingardens.  
 
-```{r filtprof map, echo=FALSE, warning = FALSE, message=FALSE, fig.width = 6,  fig.height = 8}
+```{r filtprof_map, echo=FALSE, warning = FALSE, message=FALSE, fig.width = 6,  fig.height = 8}
 allProfiles <- unique(filtprofs$filtprofFile)
 allProfiles <- c(allProfiles[-grep("Bailey",allProfiles)],allProfiles[grep("Bailey",allProfiles)])
 profCols <- c(RColorBrewer::brewer.pal(8,"Paired")[-c(5)],rep(RColorBrewer::brewer.pal(9,"Set1")[9],5))
@@ -334,10 +344,9 @@ d) compile a time series of EB or water budget for each SCM in the subcatchment
 
 e) calculate overall subcatchment statistics by summing results for all SCMs and the untreated impervious area.  
 
-![Fig. S3-7. Primary functions in BACRIfunctions.R (and modelfunctions2017.R in the case of tankmodel and gardenmodel) and the flow of calculations to achieve the primary outputs of budget_subc_time_series and EI_subc_time_series.](BACRIfunctions.png) 
 
-```{r functions_diag, eval = FALSE, echo = FALSE, warning=FALSE, message=FALSE}
-DiagrammeR::grViz("digraph {
+```{r functions_diag, eval=FALSE, echo = FALSE, warning=FALSE, message=FALSE}
+DiagrammeR::grViz("digraph rmarkdown {
 graph[overlap = TRUE, fontsize = 10]
 node [shape = box,
         fontname = Helvetica]
@@ -382,6 +391,12 @@ tankmodel -> calcTankBudget
 
 ```
 
+```{r, out.width=7, include=TRUE, fig.align="center", echo=FALSE, fig.width = 6.75, fig.height = 5.3}
+#flow chart generated in above chunk in Rstudio, and printed to pdf.
+knitr::include_graphics("images/functions_diag.pdf")
+```
+
+#### Fig. S3-7. Primary functions in BACRIfunctions.R (and modelfunctions2017.R in the case of tankmodel and gardenmodel) and the flow of calculations to achieve the primary outputs of budget_subc_time_series and EI_subc_time_series.
 
 ## Example calculations
 
@@ -418,7 +433,8 @@ title(ylab = "Effective imperviousness variant (%)", xlab = "Date", cex.lab = 0.
 load(here("data","lsc_dbs_rain_hourly.rda"))
 lsc_rain_hourly$runoff_mm <- lose.init(lsc_rain_hourly$rain_mm,0.256,2)
 lsc_runoff <- prepare_runoff_data(lsc_rain_hourly) 
-system.time(budget_29 <- budget_subc_time_series(pipeID = 29, runoffData = lsc_runoff)) #~ 12 min
+#system.time(
+  budget_29 <- budget_subc_time_series(pipeID = 29, runoffData = lsc_runoff)#) #~ 12 min
 layout(matrix(c(1,2),byrow = TRUE, 2,1), heights = c(11.5,12))
 par(mar = c(2,4,1,1))
 with(budget_29$daily, plot(date, ei_runoff/carea, type = 'l',

@@ -1,22 +1,40 @@
 ---
 title: 'Linking stormwater control performance to stream ecosystem outcomes: incorporating performance metrics into effective imperviousness'
-subtitle: 'Supplementary material S1 and S2'
+subtitle: 'Supplementary material S1, S2, S3'
 author: 'Christopher J. Walsh, Matthew J. Burns, Tim D. Fletcher, Darren G. Bos, Peter Poelsma, Joshphar Kunapo and Sam J. Imberger'
 date: 'School of Ecosystem and Forest Sciences, The University of Melbourne, 500 Yarra Boulevard, Burnley Victoria 3121, Australia '
-output:
-  word_document:
-    reference_docx: myStyle.docx
-  pdf_document: default
+output: 
+  officedown::rdocx_document:
+     reference_docx: officedown_template.docx
 csl: water-resources-research.csl
 bibliography: references.bib
 ---
 
 ```{r load_data, include = FALSE}
-source("code/BACRIfunctions.R")  #also loads required packages
+knitr::opts_chunk$set(echo = TRUE, dev = "pdf", message=FALSE) #,dpi = 200 
+source("code/BACRIfunctions.R")  
+# also loads required packages(scales, dplyr, lubridate, sf, here, RPostgreSQL,
+#                              mcr, RColorBrewer, data.table, RMySQL,"DiagrammeR")
+source("code/download.OSF.file.R")
+# also loads required packages (httr rjson, here)
 source("load_ld_scms_tables.R")
+# this script downloads data files from the OSF repository to the local directory
+fig_no <- 1
 ```
 
-### S1. Derivation and Formulaton of the stream protection metric, P
+## Introduction  
+
+This supplementary information describes detailed methods used for estimating stormwater control performance and effective imperviousness, using a long-term catchment-scale experiment in Melbourne, Australia.  
+
+The data used in the paper were structured as a postgreSQL database. The database's constituent tables are stored in an Open Science Framework repository [@walsh_etal_2021; (https://osf.io/57azq/)]. Spatial tables are stored in the spatial_data component of the repository, and non-spatial tables are stored in the linked data directory of the github repository https://github.com/cjbwalsh/lsc_dbs_scms.  The code in this document assumes it is running from a clone of that repository.
+
+S1 describes the derivation and formulation of the stream stormwater impact metric and its sub-metrics in detail.  
+
+S2 describes the methods to estimate imperviousness in the eleven study catchments. 
+
+S3 describes compilation of specification data for stormwater control measures (SCMs) that were implemented in the Little Stringybark Creek and Dobsons Creek catchments. 
+
+### S1. Derivation and Formulaton of the stream stormwater impact metric, S
 
 The stream stormwater impact metric, *S*, estimates the extent to which an SCM approximates uncontrolled stormwater flows (at its maximum value, 1)
 and the extent to which it mimics the catchment hydrology and water quality of appropriate reference streams that support good ecological condition (at its minimum value, 0).  It is the mean of four sub-metrics of different aspects of hydrology that can be addressed through SCM design and that have been posited as the primary drivers of stream degradation by urban stormwater runoff [@fletcher_etal_2011; @walsh_etal_2015; @walsh_etal_2016a].  To calculate each sub-metric, a hydrologic index (*I*) for the impervious area draining to the SCM is modelled (using an average year of rainfall data, in this case 1965-1966) in three potential states:  
@@ -75,13 +93,13 @@ S_W = max(\frac{[X]_m - [X]_n}{[X]_u - [X]_n}),0)
 \end{aligned}
 $$
 where $[X]$ is the median concentration of total phosphorus (TP), total nitrogen (TN) or total suspended solids (TSS), with subscripts as described above. 
-$[X]_u$ is the median concentration in untreated urban stormwater as assumed by a standard stormwater model (MUSIC reference?: 0.35, 2.2 and 120 mg/L for TP, TN and TSS respectively).  $[X]_m$ is the median concentration of combined outflows and overflows from the SCM, assuming no treatment for overflows, and set reductions in median concentrations for filtration systems of differing specifications (https://urbanstreams.net/lsc/EBcalctech.html). $[X]_n$, target concentrations, were derived primarily from the median concentrations observed in reference streams (C J Walsh, unpublished data):  
+$[X]_u$ is the median concentration in untreated urban stormwater as assumed by a standard stormwater model [@ewater_2013; @duncan_1999: 0.35, 2.2 and 120 mg/L for TP, TN and TSS respectively].  $[X]_m$ is the median concentration of combined outflows and overflows from the SCM, assuming no treatment for overflows, and set reductions in median concentrations for filtration systems of differing specifications (https://urbanstreams.net/lsc/EBcalctech.html). $[X]_n$, target concentrations, were derived primarily from the median concentrations observed in reference streams (C J Walsh, unpublished data):  
  
 - 20 mg/L TSS;  
 
-- median concentration in reference streams was 0.03 mg/L TP, but $[TP]_n$ was set at 0.05 mg/L, the minimum median concentration achievable by biofiltration systems [refs?];  
+- median concentration in reference streams was 0.03 mg/L TP, but $[TP]_n$ was set at 0.05 mg/L, the minimum median concentration achievable by biofiltration systems [@bratieres_etal_2008; @hatt_etal_2009];  
 
-- median concentration in the reference stream with fewest septic tanks was 0.8 mg/L TN, but $[TN]_n$ was set at 0.6 mg/L because reference sites in our study area are likely to have elevated TN concentrations, and 0.6 mg/L was achievable by biofiltration systems [refs?]).
+- median concentration in the reference stream with fewest septic tanks was 0.8 mg/L TN, but $[TN]_n$ was set at 0.6 mg/L because reference sites in our study area are likely to have elevated TN concentrations, and 0.6 mg/L was achievable by biofiltration systems [@bratieres_etal_2008; @hatt_etal_2009]).
 
 4. The volume-reduction sub-metric, $S_V$, assesses performance against a design objective to ensure that total runoff volume approximates the volume of rain falling on the impervious area that would have become streamflow in its pre-urban state.  
 
@@ -94,264 +112,78 @@ $$
 where *V* is the total runoff volume, and following the conventions above; *V*$_m$ is the volume of impervious runoff passing through the SCM that is likely to become streamflow (overflow, exfiltration, and any flow through an outlet pipe), *V*$_u$ is the total volume of impervious runoff, and V$_n$ is the volume estimated to become streamflow from an equivalent area in a forested catchment [@zhang_etal_2001]. This objective is of least direct ecological importance, but we emphasize it because addressing the large increase in runoff volume was central to achieving the other objectives [@walsh_etal_2012]. 
 
 
-### S2. Methods for determining imperviousness in the 11 study catchments
+### S2. Impervious surface mapping methods
 
 <!-- More detailed description of imperviousness determination and comparison with past estimates can be found in
 wergSpatial/Projects/LSC/experimentalData/treatmentEffectStats.Rmd (and its knitted pdf and docx versions). This 
 description is based on that document.-->
 
-```{r ei_ts}
-# #' Calculate time series of EI variants for the 6 experimental catchments
-# #' Indicative calculation times (total for all 6 catchments ~ ~2 h) was based 
-# #' on running on a computer with a 3.3 GHz processor, using Linux OS (Ubuntu 18.4)
-# system.time(ei_53 <- EI_subc_time_series(53)) #~14 min (pipeID 53 = Ln aka LSN0001)
-# system.time(ei_36 <- EI_subc_time_series(36)) #~28 min (pipeID 36 = Ls aka LSS0001)
-# system.time(ei_74 <- EI_subc_time_series(74)) #~2 min (pipeID 74 = L1 aka LIS0001)
-# system.time(ei_101 <- EI_subc_time_series(101)) #~9 min (pipeID 101 = D4 aka DBS0004)
-# system.time(ei_71 <- EI_subc_time_series(71)) # #48 min (upstream_scm results argument causes (unresolved) incorrect result)
-#                     #upstream_scm_results = list(ei_53,ei_36,ei_74))) #~4 min (pipeID 71 = L4 aka LIS0004)
-# system.time(ei_103 <- EI_subc_time_series(103)) #22 min
-#                                         # upstream_scm_results = list(ei_101))) #~9 min (pipeID 103 = D8 aka DBS0008)
-# save(ei_53,ei_36,ei_74,ei_101,ei_71,ei_103, file = "data/ei_ts.rda", compress = "xz")
-load(here("data","/ei_ts.rda"))
+A. Semi-automated classification  
 
-#SAS0002
-sasIA <- catIA[catIA$sitecode == "SAS0002",]
-#Time between first and last nearmap images used to QA the data
-ndays <- as.numeric(ymd("2019-12-31"),ymd("2009-10-12"))
-#proportional growth in impervious area over that time
-sasGrowthProp <- ((sum(sasIA$area_m2) - sum(sasIA$area_m2[is.na(sasIA$constructionDate)]))/sum(sasIA$area_m2))
-#assume exponential growth: P(t) = P(0)e^rt, so r = ln(Pt/Po)/t
-sasTIGrowthRate <- log(sum(sasIA$area_m2)/sum(sasIA$area_m2[is.na(sasIA$constructionDate)]))/ndays
-sasEIGrowthRate <- log(sum(sasIA$area_m2[sasIA$conn == 1])/sum(sasIA$area_m2[is.na(sasIA$constructionDate) & sasIA$conn == 1]))/ndays  
-#actually only one new carpark since 2001..so leave it as a step.
-constructionDates <- sasIA[!is.na(sasIA$constructionDate),]
-constructionDates <- constructionDates[order(constructionDates$constructionDate),]
-sasts <- data.frame(date = ei_101$iats$date)
-sasts$ti <- tii <- sum(sasIA$area_m2[is.na(sasIA$constructionDate)])/cats$carea_m2[cats$sitecode== "SAS0002"]
-for(i in 1:length(constructionDates$constructionDate)){
-  sasts$ti[sasts$date >= constructionDates$constructionDate[i]] <- 
-    tii <- tii + constructionDates$area_m2[i]/cats$carea_m2[cats$sitecode== "SAS0002"]
+We used  a rule-based expert classification routine [@kunapo_etal_2005] with spatial integration and aggregation to extract three classes of impervious surface (roofs, roads and paved surfaces) and two pervious classes (tree canopy and ground pervious surfaces: Fig. S`r fig_no`). Primary data sources were LiDAR point data [source], Infra-red imagery [source], waterbodies polygon layer [source], cadastre [source], road centreline data [source], and planning-zone data [source]. We derived ground and non-ground polygons from the LiDAR, and used a normalised vegetation index (NDVI) model [@carlson_ripley_1997] to distinguish roofs and trees among the non-ground polygons, and to distinguish grass from non-grass ground polygons.  
+
+The non-grass ground polygons were further screened by excluding areas classed as waterbodies. To detect roads obscured by tree cover, we used the cadastre to derive road-reserve parcels.  Within road-reserve parcels, we augmented road polygons with a buffer of width determined by street type to road centre-lines. Driveway surfaces obscured by tree canopy were manually added by inspection of the aerial photos in areas with tree cover.  Polygons were Polygons were split on parcel boundaries (See S3) and given parcel identifiers to permit parcel-wise estimates of impervious cover. We applied this method to the entire Melbourne Water area covering an area of 1,278 km2.  For this study, we report only on the areas within our study catchments.  
+
+
+```{r eval=FALSE, echo=FALSE, fig.width = 7, fig.height = 5}
+
+DiagrammeR::grViz("digraph rmarkdown{
+  graph [rankdir = TB]
+  node [fontname = Helvetica, fontsize = 36,shape = box]
+  tab1 [label = '@@1']
+  tab2 [label = '@@2']
+  tab3 [label = '@@3']
+  tab4 [label = '@@4']
+  tab5 [label = '@@5', color = 'red']
+  tab6 [label = '@@6']
+  tab7 [label = '@@7']
+  tab8 [label = '@@8']
+  tab9 [label = '@@9']
+  tab10 [label = '@@10']
+  tab11 [label = '@@11', color = 'red']
+  tab12 [label = '@@12', color = 'red']
+  
+  tab1 -> tab2 -> tab3;
+  tab4 -> tab5 -> tab6;
+  tab4 -> tab7 -> tab8;
+  tab2 -> tab5;
+  tab2 -> tab6;
+  tab3 -> tab7;
+  tab3 -> tab8;
+  tab8 -> tab9 -> tab10 -> tab11 
+  tab10 -> tab12;
 }
-ndays <- as.numeric(dmy("17-07-2009") - sasts$date[1])
-sasts$ti[sasts$date < "2009-07-17"] <- sasts$ti[sasts$date == "2009-07-17"]*exp(sasTIGrowthRate*seq(-ndays,-1,1))
-#there was no ei growth between 2009 and 2017.  There is a new carpark in Woodlands Ave (277 m2 built before 2009)....
-sasts$ei <- eii <- as.numeric(sum(sasIA$area_m2[sasIA$conn == 1])/cats$carea_m2[cats$sitecode== "SAS0002"])
-sasts$ei[sasts$date < constructionDates$constructionDate[constructionDates$conn == 1]] <- eii - 
-  as.numeric(constructionDates$area_m2[constructionDates$conn == 1])/as.numeric(cats$carea_m2[cats$sitecode== "SAS0002"])
-rc_ei_ts <- data.frame(sitecode = "SAS0002", sasts)
-
-#OLN0009
-#Correction factors for semi-automated impervious estimation
-##DBS catchment is similar to OLN and upper part of Ferny so assume similar 
-##level of error in those catchments.
-DBSparcels <- parcels[parcels$pipeID > 100,]
-DBSparcels$tiaJK <- DBSparcels$JKroofArea + DBSparcels$JKpaveArea
-DBSparcels$tia <- DBSparcels$roofAreaCon + DBSparcels$roofAreaUncon + DBSparcels$paveAreaCon + DBSparcels$paveAreaUncon
-jkUnderFactor <- sum(DBSparcels$tiaJK)/sum(DBSparcels$tia)
-jkPropUnderFactor <- sum(DBSparcels$tiaJK[DBSparcels$parcelType == "property"])/sum(DBSparcels$tia[DBSparcels$parcelType == "property"])
-jkRoadOverFactor <- sum(DBSparcels$tiaJK[DBSparcels$parcelType == "road"])/sum(DBSparcels$tia[DBSparcels$parcelType == "road"])
-
-olnIA <- catIA[catIA$sitecode == "OLN0009",]
-# apply correction factor to properties only.  Roads have been redrawn and corrected in this catchment.
-# # compare ia table and olnIA....
-olnTI2009 <- as.numeric((sum(olnIA$area_m2[is.na(olnIA$constructionDate) & 
-                                             olnIA$surfType != "road"])/jkPropUnderFactor + 
-                           sum(olnIA$area_m2[is.na(olnIA$constructionDate) & 
-                                               olnIA$surfType == "road"]))/cats$carea_m2[cats$sitecode == "OLN0009"])
-#cw corrected the connected impervious polygons, so no correction factor for ei
-olnEI2009 <- as.numeric(sum((olnIA$area_m2*olnIA$conn)[is.na(olnIA$constructionDate)])/(cats$carea_m2[cats$sitecode == "OLN0009"]))
-####to do: Need to cut JK ia for OLN and LYR yet
-#oln_JKTI_2009 <- sum(olnTIA_JK@data$Shape_Area)/cats$carea_m2[cats$sitecode== "OLN0009"]
-olnts <- data.frame(date = ei_101$iats$date)
-olnts$ti <- olnTI2009*exp(sasTIGrowthRate*as.numeric(ei_101$iats$date - dmy("17-07-2009")))
-#there was no ei growth over the study period in this catchment....
-olnts$ei <- olnEI2009
-rc_ei_ts <- rbind(rc_ei_ts, data.frame(sitecode = "OLN0009", olnts))
-
-#LYR0007
-lyrIA <- catIA[catIA$sitecode == "LYR0007",]
-lyrEI2009 <- sum(lyrIA$area_m2[lyrIA$conn == 1])/(cats$carea_m2[cats$sitecode== "LYR0007"])
-lyrTI2009 <- sum(lyrIA$area_m2[is.na(lyrIA$constructionDate)])/(cats$carea_m2[cats$sitecode== "LYR0007"])
-constructionDates <- lyrIA[!is.na(lyrIA$constructionDate),]
-constructionDates <- constructionDates[order(constructionDates$constructionDate),]
-lyrts <- data.frame(date = ei_101$iats$date)
-lyrts$ti <- tii <- sum(lyrIA$area_m2[is.na(lyrIA$constructionDate)])/cats$carea_m2[cats$sitecode== "LYR0007"]
-for(i in 1:length(constructionDates$constructionDate)){
-  lyrts$ti[lyrts$date >= constructionDates$constructionDate[i]] <- tii <- tii + constructionDates$area_m2[i]/cats$carea_m2[cats$sitecode== "LYR0007"]
-}
-
-#ei consistently zero, only one new building in the catchment in the last 20 years
-lyrts$ei <- eii <- as.numeric(sum(lyrIA$area_m2[lyrIA$conn == 1])/cats$carea_m2[cats$sitecode== "LYR0007"])
-lyrts$ei[lyrts$ei < constructionDates$constructionDate[constructionDates$conn == 1]] <- eii - 
-  as.numeric(constructionDates$area_m2[constructionDates$conn == 1]/cats$carea_m2[cats$sitecode== "LYR0007"])
-rc_ei_ts <- rbind(rc_ei_ts, data.frame(sitecode = "LYR0007", lyrts))
-
-#Control sites----
-##BRS0015
-#correction factor derived from QAQC of portions of Brushy Creek catchment
-# brsSubCat <- sf::st_read("~/uomShare/wergSpatial/Projects/LSC/foundationPaper/data/ESRI/BRS_QA/BrushyUpperCat.shp", quiet = FALSE)
-# brsTIA_JK <- sf::st_read("~/uomShare/wergSpatial/Projects/LSC/foundationPaper/data/ESRI/BRS_QA/BrushyTIA_JK.shp", quiet = FALSE)
-# brsTIA <- sf::st_read("~/uomShare/wergSpatial/Projects/LSC/foundationPaper/data/ESRI/BRS_QA/BrushyTIA_AL.shp", quiet = FALSE)
-# brsTIA_JK$area_m2 <- sf::st_area(brsTIA_JK)
-# brsTIA$area_m2 <- sf::st_area(brsTIA)
-# brsTIA$constructionDate <- lubridate::ymd(brsTIA$X.constDate)
-# brsTIA$constYear <- lubridate::decimal_date(brsTIA$constructionDate)
-# #calculate correction on those polygons not identified as new in QA
-# brsJKCorrection <- as.numeric(sum(brsTIA_JK$area_m2)/sum(brsTIA$area_m2[is.na(brsTIA$constYear)]))
-brsJKCorrection <- 0.9327931
-#Time between first and last nearmap images used to QA the data
-nyears <- lubridate::decimal_date(lubridate::ymd("2019-12-31")) - 
-  lubridate::decimal_date(lubridate::dmy("12-10-2009"))
-#assume exponential growth: P(t) = P(0)e^rt, so r = ln(Pt/Po)/t
-brsTIGrowthRate <- as.numeric(log(sum(brsTIA$area_m2)/
-                                    sum(brsTIA$area_m2[is.na(brsTIA$constructionDate)]))/nyears)
-#growth in the test area is likely to be ~150% higher than most parts of the catchment
-brsTIGrowthRate <- brsTIGrowthRate*0.67
-brs_IA_map <- catIA[catIA$sitecode == "BRS0015",]
-TI2009 <- sum(brs_IA_map$area_m2)/cats$carea_m2[cats$sitecode== "BRS0015"]
-#and my accompanying estimate of EI
-EI2009 <- sum(brs_IA_map$area_m2*brs_IA_map$conn*0.9)/cats$carea_m2[cats$sitecode== "BRS0015"]
-#estimate TI accounting for JKCorrection
-brs_TI_2009 <- as.numeric(TI2009/brsJKCorrection)
-#and subsequent corrected EI estimate
-brs_EI_2009 <- brs_TI_2009*EI2009/TI2009
-brsts <- data.frame(date = ei_101$iats$date)
-brsts$ti <-  brs_TI_2009*exp(brsTIGrowthRate*(lubridate::decimal_date(brsts$date) -  
-                                                lubridate::decimal_date(lubridate::dmy("17-07-2009"))))
-EIfactor <- EI2009/TI2009
-brsts$ei <- brsts$ti*EIfactor
-rc_ei_ts <- rbind(rc_ei_ts, data.frame(sitecode = "BRS0015", brsts))
-
-#FER0006
-ferIA <- catIA[catIA$sitecode == "FER0006",]
-ferCorrFactor <- mean(brsJKCorrection, jkUnderFactor)
-ferTI2009 <- sum(ferIA$area_m2[is.na(ferIA$constructionDate)])/(cats$carea_m2[cats$sitecode== "FER0006"]*ferCorrFactor)
-ferEI2009 <- sum(ferIA$area_m2[ferIA$conn == 1]*0.9)/(cats$carea_m2[cats$sitecode== "FER0006"]*ferCorrFactor)
-ferts <- data.frame(date = ei_101$iats$date)
-#growth in FER likely to be 0.5 of that in BRS
-ferts$ti <-  ferTI2009*exp(0.5*brsTIGrowthRate*as.numeric(
-  lubridate::decimal_date(ferts$date) -  lubridate::decimal_date(lubridate::dmy("17-07-2009"))))
-EIfactor <- ferEI2009/ferTI2009
-ferts$ei <- ferts$ti*EIfactor
-save(treatSeq, file = paste(data_dir, "compiled_R_objects/treatSeq.rda", sep = ""))
-rc_ei_ts <- rbind(rc_ei_ts, data.frame(sitecode = "FER0006", ferts))
-rc_ei_ts$sitecode <- as.vector(rc_ei_ts$sitecode)
-save(rc_ei_ts, file = "compiled_objects/rc_ei_ts.rda", compress= "xz")
-
-#' Prepare hourly_data (rainfall and runoff data) for LSC and DBS catchments
-#' Need to revisit this once initial loss paramters are settled upon.
-
-# lscRain6min <- sqlQuery("lsc","SELECT * FROM rainfall WHERE sitecode = 'LIS0004'")
-# dbsRain6min <- sqlQuery("lsc","SELECT * FROM rainfall WHERE sitecode = 'DBS0004'")
-# lscRain6min$dateTime <- ymd_hms(lscRain6min$dateTime, tz = "UTC")
-# dbsRain6min$dateTime <- ymd_hms(dbsRain6min$dateTime, tz = "UTC")
-# lscET6min <- sqlQuery("lsc","SELECT * FROM potET WHERE sitecode = 'LIS0004'")
-# dbsET6min <- sqlQuery("lsc","SELECT * FROM potET WHERE sitecode = 'DBS0004'")
-# lscET6min$dateTime <- ymd_hms(lscET6min$dateTime, tz = "UTC")
-# dbsET6min$dateTime <- ymd_hms(dbsET6min$dateTime, tz = "UTC")
-# commonStart <- lubridate::ymd_hms("2000-01-01 10:00:00", tz = "UTC")
-# commonFin <- lubridate::ymd_hms("2019-02-07 09:54:00", tz = "UTC")
-# lscET6min <- lscET6min[lscET6min$dateTime >=  commonStart & lscET6min$dateTime <= commonFin,]
-# dbsET6min <- dbsET6min[dbsET6min$dateTime >= commonStart & dbsET6min$dateTime <= commonFin,]
-# lscRain6min <- lscRain6min[lscRain6min$dateTime >= commonStart & lscRain6min$dateTime <= commonFin,]
-# dbsRain6min <- dbsRain6min[dbsRain6min$dateTime >= commonStart & dbsRain6min$dateTime <= commonFin,]
-# lscRain6min$ET <- lscET6min$Mpot_mm[match(lscRain6min$dateTime, lscET6min$dateTime)]
-# dbsRain6min$ET <- dbsET6min$Mpot_mm[match(dbsRain6min$dateTime, dbsET6min$dateTime)]
-# lscRain6min <- data.table::data.table(lscRain6min)
-# dbsRain6min <- data.table::data.table(dbsRain6min)
-# lscRain6min$hour <- floor_date(lscRain6min$dateTime,"hours")
-# dbsRain6min$hour <- floor_date(dbsRain6min$dateTime,"hours")
-# lsc_rain_hourly <- lscRain6min[, lapply(.SD, sum, na.rm=TRUE), by=hour, .SDcols=c("Rain_depth","ET") ]
-# dbs_rain_hourly <- dbsRain6min[, lapply(.SD, sum, na.rm=TRUE), by=hour, .SDcols=c("Rain_depth","ET") ]
-# names(lsc_rain_hourly) <- names(dbs_rain_hourly) <- c("datetime","rain_mm","et_mm")
-#save(lsc_rain_hourly, dbs_rain_hourly, file = here("data","lsc_dbs_rain_hourly.rda"), compress = "xz")
-# rm(lscRain6min,dbsRain6min,lscET6min,dbsET6min)
-
-#' Assuming the above extraction of data from the lsc database has been run...
-load(here("data","lsc_dbs_rain_hourly.rda"))
-lsc_rain_hourly$runoff_mm <- lose.init(lsc_rain_hourly$rain_mm,0.256,2)
-lsc_runoff <- prepare_runoff_data(lsc_rain_hourly) 
-dbs_rain_hourly$runoff_mm <- lose.init(dbs_rain_hourly$rain_mm,0.256,2)
-dbs_runoff <- prepare_runoff_data(dbs_rain_hourly)
- 
-#' Calculate time series of water balance elements for the 6 experimental catchments over the 20-year study period
-#' Indicative calculation times (total for all 6 catchments ~2 h) was as for ei_ts above
-
-system.time(budget_53 <- budget_subc_time_series(pipeID = 53, runoffData = lsc_runoff)) # ~12 min
-system.time(budget_36 <- budget_subc_time_series(pipeID = 36, runoffData = lsc_runoff)) # ~22 min
-system.time(budget_74 <- budget_subc_time_series(pipeID = 74, runoffData = lsc_runoff)) # ~10 min
-system.time(budget_101 <- budget_subc_time_series(pipeID = 101, runoffData = dbs_runoff)) # ~12 min
-system.time(budget_71 <- budget_subc_time_series(pipeID = 71, runoffData = lsc_runoff)) # ~50 min
-system.time(budget_103 <- budget_subc_time_series(pipeID = 103, runoffData = dbs_runoff)) # ~20 min,
-save(budget_53,budget_36,budget_74,budget_101,budget_71,budget_103, file = "compiled_objects/budget_ts.rda", compress = "xz")
-
-#' Assuming the above budget_subc_time_series calculations have been run...
-load("compiled_objects/budget_ts.rda")
-lo <- layout(matrix(c(1,2,3,1,4,5,1,6,7,0,8,8),4,3,byrow = TRUE),widths = c(1,10,10),heights = c(10,10,10,1))
-par(mar = c(0,0,0,0))
-plot.new()
-title(ylab = "Impervious runoff (mm)", line = -1.5)
-par(mar = c(2,2,1,1))
-##daily inflow = hourly ei_scm_runoff
-with(budget_53$hourly[date > "2018-01-01"], plot(date, ei_runoff/carea, type = 'l')); 
-with(budget_53$hourly[date > "2018-01-01"], lines(date, ei_scm_runoff/carea, col = 'red')); title(main = "a) LSN0001", adj = 0)
-with(budget_36$hourly[date > "2018-01-01"], plot(date, ei_runoff/carea, type = 'l')); 
-with(budget_36$hourly[date > "2018-01-01"], lines(date, ei_scm_runoff/carea, col = 'red')); title(main = "b) LSS0001", adj = 0)
-with(budget_74$hourly[date > "2018-01-01"], plot(date, ei_runoff/carea, type = 'l')); 
-with(budget_74$hourly[date > "2018-01-01"], lines(date, ei_scm_runoff/carea, col = 'red'));  title(main = "c) LIS0001", adj = 0)
-with(budget_71$hourly[date > "2018-01-01"], plot(date, ei_runoff/carea, type = 'l')); 
-with(budget_71$hourly[date > "2018-01-01"], lines(date, ei_scm_runoff/carea, col = 'red')); title(main = "d) LIS0004", adj = 0)
-with(budget_101$hourly[date > "2018-01-01"], plot(date, ei_runoff/carea, type = 'l')); 
-with(budget_101$hourly[date > "2018-01-01"], lines(date, ei_scm_runoff/carea, col = 'red'));  title(main = "e) DBS0004", adj = 0)
-with(budget_103$hourly[date > "2018-01-01"], plot(date, ei_runoff/carea, type = 'l')); 
-with(budget_103$hourly[date > "2018-01-01"], lines(date, ei_scm_runoff/carea, col = 'red'));  title(main = "f) DBS0008", adj = 0)
-par(mar = c(0,0,0,0))
-plot.new()
-title(xlab = "Date", line = -1.5)
-
+  
+  [1]: paste0('1. LiDAR height model', '\\n ', '(non-ground minus ground data)')
+  [2]: paste0('1.1. Develop a non-ground', '\\n ', 'polygon layer for height >1.5 m')   
+  [3]: paste0('1.2. Develop a ground polygon layer', '\\n ', 'by removing non-ground polygons', '\\n ','from the study area polygons')      
+  [4]: paste0('2. NDVI model', '\\n ', '([infrared - red]/[infrared + red]) * 100')
+  [5]: paste0('2.1. Roofs: select NDVI ', '\u2264 20', '\\n ', 'within non-ground polygon.', '\\n ', 'Perform QA and finalise roofs layer')   
+  [6]: paste0('2.2. Trees: Remove roofs from ', '\\n ', 'non-ground polygons to form', '\\n ','a tree layer')      
+  [7]: paste0('2.3 Grass: select NDVI >20', '\\n ', 'within ground polygon')
+  [8]: paste0('2.4. Other: remove grass from ground', '\u2264 20', '\\n ', 'polygons to form other areas.', '\\n ', '(paving, bare soils, unsealed roads, water)') 
+  [9]: paste0('3.1. Use waterbodies polygon layer to', '\\n ', 'remove waterbodies from other')
+  [10]: paste0('3.2. Use cadastre to split all', '\\n ', 'ground polygons into road and property parcels')
+  [11]: paste0('3.3. Use road type classes from', '\\n ', 'centreline data to separate unsealed', '\\n ', 'roads in road polygons to form roads layer')
+  [12]: paste0('3.4. Use planning scheme zone data', '\\n ', 'to identify properties likely to have', '\\n ', 'paved ground surfaces, remove bare soil', '\\n ', 'from other to form paved impervious layer')
+  ")
+```
+```{r, include=TRUE, fig.align="center", echo=FALSE, fig.width = 6.75, fig.height = 5}
+#flow chart generated in above chunk in Rstudio, and printed to pdf.
+knitr::include_graphics("images/imp_determination_flow_diag.pdf")
 ```
 
-The data plotted in Fig. 1. has been saved as ESRI shapefiles (".../wergSpatial/Projects/LSC/experimentalData/ESRI") and as simple feature objects in '.rds' files (".../wergSpatial/Projects/LSC/experimentalData/sf"). The second code chunk in the Rmarkdown document used to build this document preserves the compilation of these files (commented-out) and uses the rds files to plot Figure 1.  The following notes also refer to some layers prepared by Grace-GIS that can be found on the WERG shared drive at ".../wergSpatial/MWRegion/Vectors".
+#### Fig. S-`r fig_no`. Process flow diagram for semi-automated determination of polygon layers for the three classes of impervious surface (red boxes).    
 
-_The catchment boundaries layer (catMap)_ is derived from Grace-GIS's 'engineered' elevation model that accounts for stormwater drainage networks. Chris Walsh extensively revised these data manually to better match contours and flow paths around constructions (for instance, most buildings on a catchment boundary were not split, and they were assumed to flow to one catchment).  This layer contains full catchment boundaries for each of 13 points. They are arranged so that smaller subcatchment polygons will render above larger subcatchments.  There are 13 catchments rather than 11 because of:  
+B.	Manual validation and correction  
 
-- The mainstem Little Stringybark Creek has two sites with different catchment areas.  LIS0004H (the flow gauge) has a larger catchment than the eccological sampling reach upstream (LIS0004).  
+We used the semi-automated data as a base dataset to derive a final corrected impervious dataset.  We used the series of nearmap.com aerial images from 2009 to 2017 (www.nearmap.com) to manually correct boundaries and classification (roof or paved, the latter being a combination of road and ‘other’ in the semi-automated data) of impervious polygons in every property and road parcel of L4, D8 (and their nested subcatchments), Ly, Sa, and a 70-ha portion of the more densely developed Br. Using multiple images permitted better discrimination of surfaces in treed areas that were obscured in some images but not others, in addition to deriving construction dates of recent surfaces. 
 
-- The southern tributary of Little Stringybark Creek (LSS0001) has two alternative catchments because the raingarden built on The Entrance diverted Bailey Road into the LSS0001, which had previously drained to mainstem downstream of LIS0001 and LSS0001.  
+For other catchments, Google street view was used to check and correct all road and driveway surfaces, but property surfaces were not checked. Major omissions and misclassifications in Fe and Ol were corrected, but paved surfaces on properties were not corrected.  For areas that were not completely corrected, correction factors were applied to imperviousness estimates based on similar checked areas (see the code below).  
 
-The following are logical statements required to map subsets of these data:  
+The available time series of images (2000, 2004, and nearmap imagery from 2009 to 2017 at 1-6 mo intervals) were used to estimate dates of constructions or demolitions of impervious surfaces were noted for relevant polygons in all parcels in L4, D4, D8, Ly, Sa, and portions of Fe, Ol, and Br.  These data were used to construct time-series of growth in impervious area in the first 5 catchments, and similar time series were estimated for the last 3 by applying growth rates of areas of similar development to the 2009 estimates of impervious area in the areas that had not been systematically checked at the parcel level. The code in 'load_ld_scms_tables.R' builds a data frame of TI and EI time series for each of the eleven study catchments, from construction date data in the parcelChanges table in the SCMs database (see S3) for the 6 experimental catchments (L1, Ln, Ls, L4, D4 and D8), and from a combination of construction date data in the catIA table and application of growth factors.
 
-- 7 core ecological sites: catMap[(catMap\$cat != "LIS0004H" & grepl("core",catMap\$FIRST_type)) | catMap\$FIRST_type %in% c("control","reference"),]  
+The code in 'load_ld_scms_tables.R' (sourced in compiling this document) records the process used to compile TI and EI time series for eleven catchments into a data.frame called `ei_ts`.
 
-- 7 core hydrologic sites: catMap[(catMap\$cat != "LIS0004" & grepl("core",catMap\$FIRST_type)) | catMap\$FIRST_type %in% c("control","reference"),]  
 
-- 11 ecological sites: catMap[catMap\$cat != "LIS0004" & !grepl("pre",catMap\$FIRST_type),]  
-
-- 11 hydrologic sites: catMap[catMap\$cat != "LIS0004H" & !grepl("pre",catMap\$FIRST_type),]  
-
-- 11 ecological sites (post-"The Entrance raingarden"): catMap[catMap\$cat != "LIS0004" & !grepl("post",catMap\$FIRST_type),]  
-
-- A single site and its catchment: catMap[catMap\$cat == "LIS0004",]  
-
-_The sites layer (siteMap)_ was manually generated, to show the location of our monitoring sites.  It contains 16 points, including:  
-
-- locations of flow gauges: siteMap[grep("flow",tolower(siteMap@data$Comment)),]  
-
-- locations of (the bottom point of) ecological sampling reaches: siteMap[grep("ecological",tolower(siteMap@data$Comment)),]  
-
-For all sites except LIS0004, the difference in locations between flow gauge and ecological sampling reach make only trivial differences to catchment areas, so separate catchments have not been drawn for sites other than LIS0004.  Samples taken at LIS0004 before 2009 were at a site several 100 meters downstream of the current reach (in the macroinvertebrate database, this is called LIS0004), so those data should be treated with care (macroinvertebrate samples were taken from both sites on two occasions in 2009, showing little difference between the two reaches).  The LIS0001 ecological sampling reach was moved from upstream of Polat Court to upstream of Forge Road (the mapped site) in 20XX.  Samples taken at this site before then should be treated with caution.  
-
-_The streams layer (streamsMap)_ was cropped from "MWregion_streams_310117" and augmented using "MW_DR_STR_PlusExtn MW_DR_Network_With_GGIS_Extensions" as a guide for hand-drawn lines, primarily for cosmetic purposes (to make the stream network in each catchment comparably extensive, and to fill gaps such as Lillydale Lake), but also extending the stream lines to spring heads that Chris Walsh has ground-truthed.  This exercise also identified an error in the lines for upper Lyrebird Creek in the MWregion_streams, which has been corrected in this layer.  
-
-_The impervious area layer (iaMap)_ contains polygons of impervious surfaces within the study catchments only (see Fig. 1).  If you want to produce a map that shows all impervious surfaces, use the layer "TI_2009_Final_2016-06.gdb", from which iaMap was derived.  This layer has been corrected to varying extents for each catchment (see the second code chunk in the Rmarkdown version of this document for details on the compilation of this layer).  The individual catchments were assessed and corrected separately in QGIS. Some, but not all, of the catchment maps include constructions built since 2009. To produce a map of 2009 impervious coverage, polygons with constDate < "2009-10-01" should be selected".  
-
-LYR0007, SAS0002 and LIS0004H (and its subscatchments) were all manually checked (using Google maps, street view, and NearMap imagery), correcting misclassified roads and paved surfaces, and missed buildings, including new constructions since 2009 (since 2006 in LIS: see imperviousAuditMethodologicalNotes.rmd) were noted with a construction date (constDate field), and each polygon was classified as connected or not (conn field) based on catchment inspections.  For SAS, it has been assumed that the impervious surfaces draining to the Sassafras township drain (and then into the incised 'canyon' below the town are connected).  
-
-OLN0009 and FER0006 were checked, but not thoroughly.  ALl incorrectly classified unsealed roads were removed, and some new and missed buildings identified (new buildings were given a constDate). Most importantly, private paved surfaces were not corrected in these catchment. Those in OLN are likely to have been missed at a similar rate to those in DBS, which is similarly developed and forested, and for FER the upper catchment is likely to have been missed at a similar rate to DBS, while the lower part of the catchment around Upwey is likely to be more similar to BRS.  Connection status in these catchments has not been checked as thoroughly as the above catchments.  
-
-A small portion of BRS0015 (~70 ha) was thoroughly checked to estimate error and growth rates, but the impervious layer used in this map layer has not been checked.  As the error rate in the checked portion was low in this urban catchment, this is likely to be an adequate representation for mapping purposes.  Growth was substantial since 2009 in the sampled portion, and it appears from NearMap images, that that growth rate was similar in the other connected parts of the catchment.  Impervious areas classed as unconnected in this catchment are highly likely to be unconnected.  It is probable that some of the surfaces in the areas classed as connected are also not directly connected, so an indicative multiplier of 85% should be applied to the connected impervious area in this catchment to approximate true EI.  
-
-DBS0004 and DBS0008 were thoroughly checked to estimate error and growth rates. However, this was the first catchment to be checked, and a different (suboptimal) approach was taken to checking. Instead of manually correcting incorrect polygon boundaries, correction factors for each property were tabulated to estimate parcel-wise impervious area. The document DobsonsImperviousEstimates.Rmd, which describes the process, originally used the uncorrected shapefile "dbsIAParcelsJKsubcs". It was subsequently found that this file and the associated parcels layer had overlapping duplicate polygons in several parcels.  These were deleted, and incorrectly classified unsealed roads were deleted from this shapefile, which was then saved as "dbsIAParcelsJKsubcs_corrected".  This version was used in the reviesed version, DobsonsImperviousEstimates1.Rmd, and is used for mapping. This layer shares inacccuracies in building and parcel paved areas with OLN0009 and FER0006, but is adequate for mapping purposes.  
-  
 

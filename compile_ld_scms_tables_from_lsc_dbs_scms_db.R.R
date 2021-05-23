@@ -40,6 +40,7 @@ parcels <- parcels[!names(parcels) %in% c("address","streetNo","streetSuff",
 parcels <- parcels[c("parcelID","nextds","pipeID","parcelType","roofAreaCon",
                      "roofAreaUncon","paveAreaCon","paveAreaUncon","parcelArea","area_m2","geometry" )]
 ia <- ia[names(ia) != "address"]
+parcelChanges <- parcelChanges[names(parcelChanges) != "address"]
 scmProjects <- scmProjects[!names(scmProjects) %in% c("address","costProject","costGovt","costOwner")]
 scms <- scms[names(scms) != "address"]
 scmsDecommissioned <- scmsDecommissioned[names(scmsDecommissioned) != "address"]

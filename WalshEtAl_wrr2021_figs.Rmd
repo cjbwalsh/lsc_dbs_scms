@@ -303,7 +303,7 @@ Fig. 2.
 Fig. 3  
 
 ```{r MonitoringSiteTrendsA, results="hide", warning = FALSE, echo = FALSE, fig.width = 7, fig.height = 9, fig.cap = "Time series of effective impervious variants achieved in each of the four LSC catchments."}
-load(here::here("compiled_objects","ei_ts.rda"))
+load(here::here("data","ei_ts.rda"))
 layout(matrix(c(1,2,3,1,4,5,1,6,7,0,8,8),4,3,byrow = TRUE),heights= c(10,10,10,1),widths = c(1,10,10))
 par(mar = c(0,0,0,0))
 plot.new()
