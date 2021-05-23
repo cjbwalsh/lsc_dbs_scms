@@ -4,4 +4,5 @@
 .Ruserdata
 scratch.R
 *.docx
+!officedown_template.docx
 data/*.gpkg

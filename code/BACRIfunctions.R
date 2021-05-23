@@ -2,7 +2,8 @@
 ### A collection of functions for use with the lsc_dbs_scm database
  
 requiredPackages <- c("scales","dplyr","lubridate","sf","here","RPostgreSQL",
-                      "mcr","RColorBrewer","data.table","RMySQL","DiagrammeR")
+                      "mcr","RColorBrewer","data.table","RMySQL","DiagrammeR",
+                      "flextable")
 lapply(requiredPackages, require, character.only = TRUE, quietly = TRUE)
 #assumes you are either in lsc_dbs_scms directory or a sibling directory of its
 #parent directory
@@ -10,6 +11,22 @@ modfunctions <- ifelse(grepl("lsc_dbs_scms", getwd()),
                              here::here("code", "modelfunctions2017.R"),
                        "../lsc_foundation/code/modelfunctions2017.R")
 source(modfunctions)
+
+
+table_for_word <- function(input_table, pgwidth = 6.69){  
+ft <- flextable::regulartable(input_table)
+ft <- flextable::align(ft, align = "left", part = "all")
+ft <- flextable::valign(ft, valign = "top", part = "all")
+ft <- flextable::font(ft,fontname = "Helvetica", part = "all")
+ft <- flextable::fontsize(ft, size = 10, part = "all")
+ft <- flextable::padding(ft, padding.top = 2,  padding.bottom = 2, part = "all")
+ft <- flextable::autofit(ft)
+# fit to window for MS Word (adapted from
+# https://stackoverflow.com/questions/57175351/flextable-autofit-in-a-rmarkdown-to-word-doc-causes-table-to-go-outside-page-mar)
+ft <- width(ft, width = dim(ft)$widths*pgwidth /(flextable_dim(ft)$widths))
+ft
+}
+
 
 # Postgres helper functions ---------------------------------
 # # Minor datatabase management functions for lsc_dbs_scm database
