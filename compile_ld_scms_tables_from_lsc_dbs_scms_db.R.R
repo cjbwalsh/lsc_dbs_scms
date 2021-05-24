@@ -72,4 +72,20 @@ save(dds, filtprofs, metadata, parcelChanges,
      raingardens, scmChanges, scmProjects, 
      scmsDecommissioned, tanks, file = "data/db_non_sf.rda", compress = "xz")
 
+#Plus LSC hourly rainfall data for S4.
+start6min <- ymd_hms("2001-05-31 10:00:00", tz = "UTC")
+fin6min <- ymd_hms("2019-07-25 09:54:00", tz = "UTC")
+lscRain6min <- sqlQuery("SELECT * FROM rainfall WHERE sitecode = 'LIS0004';", "lsc")
+lscRain6min$dateTime <- ymd_hms(lscRain6min$dateTime, tz = "UTC")
+lscET6min <- sqlQuery("SELECT * FROM potET WHERE sitecode = 'LIS0004';", "lsc")
+lscET6min$dateTime <- ymd_hms(lscET6min$dateTime, tz = "UTC")
+lscET6min <- lscET6min[lscET6min$dateTime >= start6min & lscET6min$dateTime <= fin6min,]
+lscRain6min <- lscRain6min[lscRain6min$dateTime >= start6min & lscRain6min$dateTime <= fin6min,]
+lscRain6min$ET <- lscET6min$Mpot_mm[match(lscRain6min$dateTime, lscET6min$dateTime)]
+lscRain6min <- data.table::data.table(lscRain6min)
+lscRain6min$hour <- floor_date(lscRain6min$dateTime,"hours")
+lscRainHourly1 <- lscRain6min[, lapply(.SD, sum, na.rm=TRUE), by=hour, .SDcols=c("Rain_depth","ET") ]
+lsc_rain_hourly <- lscRainHourly1
+names(lsc_rain_hourly) <- c("datetime","rain_mm","et_mm")
+save(lsc_rain_hourly, file = "data/lsc_rain_hourly.rda", compress = "xz")
 
