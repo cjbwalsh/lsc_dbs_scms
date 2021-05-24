@@ -31,20 +31,21 @@ if (length(gpkg_files) > 0) {
 
 # load large rda from osf
 data_files <- dir(here::here("data"))
-if (!"lsc_dbs_rain_hourly.rda" %in% data_files) {
-  download.OSF.file(GUID = "8t6v9",
-                    Access_Token = "https://osf.io/3um4v/?view_only=7392be708374475b98e5ebbf2f86855f",
-                    file_name = "lsc_dbs_rain_hourly.rda", subdir = "data")
+if (!"lsc_rain_hourly.rda" %in% data_files) {
+  download.OSF.file(GUID = "8hrwq",
+                    Access_Token = "https://osf.io/u9ews/?view_only=dbe76f4ac4b144ce8d5125439b5260ea",
+                    file_name = "lsc_rain_hourly.rda", subdir = "data")
 }
 
+# load non-spatial files
+# 1 large file on OSF
 for (i in 1:length(all_gpkgs)) {
   temp <- sf::st_read(here::here("data",paste(all_gpkgs[i],sep = "")), 
                       stringsAsFactors = FALSE, quiet = TRUE)
   temp <- sf::st_set_geometry(sf::st_set_geometry(temp,NULL), sf::st_geometry(temp)) # set geometry, return sf
   assign(gsub(".gpkg","",all_gpkgs[i]),temp)
 }
-
-# load non-spatial files
+# small files kept on github
 rda_files <-  dir(here::here("data"))[grep(".rda",dir(here::here("data")))]
 for (i in 1:length(rda_files)) {
   if (rda_files[i] == "Croydon_1966_hourly_rain_runoff_et.rda") {
