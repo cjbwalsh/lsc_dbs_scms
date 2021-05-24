@@ -23,17 +23,28 @@ example_pipeID <- 29 # used in S3
 fig_no <- 1          # used throughout to number figures.
 ```
 
+## Contents of this file  
+
+Text S1 to S4  
+
+Figures S1 to S11  
+
+Tables S1 to S2   
+
+
 ## Introduction  
 
 This supplementary information describes detailed methods used for estimating stormwater control performance and effective imperviousness, using a long-term catchment-scale experiment in Melbourne, Australia.  
 
-The data used in the paper were structured as a postgreSQL database. The database's constituent tables are stored in an Open Science Framework repository [@walsh_etal_2021; (https://osf.io/57azq/)]. Spatial tables are stored in the spatial_data component of the repository, and non-spatial tables are stored in the linked data directory of the github repository https://github.com/cjbwalsh/lsc_dbs_scms.  The code in this document assumes it is running from a clone of that repository.
+The data used in the paper were structured as a postgreSQL database. The database's constituent tables are stored in an Open Science Framework repository [@walsh_etal_2021; (https://osf.io/57azq/)]. Spatial tables are stored in the spatial_data component of the repository, and non-spatial tables are stored in the linked data directory of the github repository https://github.com/cjbwalsh/lsc_dbs_scms.  The repository also holds the Rmarkdown document used to construct this document. The code in that document assumes it is running from a clone of that repository.
 
 S1 describes the derivation and formulation of the stream stormwater impact metric and its sub-metrics in detail.  
 
 S2 describes the methods to estimate imperviousness in the eleven study catchments. 
 
 S3 describes compilation of specification data for stormwater control measures (SCMs) that were implemented in the Little Stringybark Creek and Dobsons Creek catchments. 
+
+S4 describes calculation of EI and water fluxes in study subcatchments.  
 
 ##### page break  
 
@@ -189,7 +200,7 @@ The available time series of images (2000, 2004, and nearmap imagery from 2009 t
 The code in 'load_ld_scms_tables.R' (sourced in compiling this document) records the process used to compile TI and EI time series for eleven catchments into a data.frame called `ei_ts`. Note that the catIA table that is used to compile time series for the reference and control catchments is not part of the database described in S3.  
 
 ##### page break  
-### S3. Stormwater control measure location and specification data  
+### S3. Stormwater control measure specification and location data  
 
 Data detailing the specifications of all SCMs in the two catchments (Little Stringybark and Dobsons) were compiled into the postgreSQL database (Fig. S`r fig_no + 1`). 
 
@@ -269,9 +280,9 @@ The catchments of the two most downstream experimental sites were also divided i
 
 - property parcels, obtained from the government cadastre (land.vic.gov.au), cut to the catchment boundaries of D8 and L4 using the intersect function in QGIS. Some manual editing of the resulting property parcel layer was required to a) combine parcels on several properties that functioned as single properties, but were mapped as multiple titles, b) split several parcels that had been recently subdivided; and c) split any property parcels that spanned two pipe subcatchments and that had impervious areas that drained to different subcatchments. The last case was rare, and restricted to some larger properties: most properties had a single point of legal discharge to which stormwater runoff was required to drain.
 
-- road parcels, obtained using the difference function in QGIS (between the property parcel and the catchment boundary layers) to identify the road reserves of each catchment, as the cadastre has gaps for road reserves. This extracted road reserve layer was manually split (using the split features tool) at intersections, and a unique parcelID was created for each newly created road parcel. 
+- road parcels, obtained using the difference function in QGIS (between the property parcel and the catchment boundary layers) to identify the road reserves of each pipe subcatchment, as the cadastre has gaps for road reserves. This extracted road reserve layer was manually split (using the split features tool) at intersections, and a unique parcelID was created for each newly created road parcel. 
 
-Property and road parcels were combined into a single spatial table, parcels (Fig. S`r fig_no + 1`).   
+Property and road parcels were combined into a single spatial table, parcels (Fig. S`r fig_no`).   
   
 ```{r figS5_iaMap, echo = FALSE, warning=FALSE, message=FALSE, dev = "png", dpi = 300, fig.width = 7, fig.height = 4}
 fig_no <- fig_no + 1
@@ -310,7 +321,7 @@ For all impervious polygons in table ia that were constructed, demolished or con
 
 ### Table scmProjects  
 
-The `r dim(scmProjects)[1]` stormwater control projects in the two experimental catchments, identified by a unique "projectID", were discrete, identifiable projects on a single parcel (matched to table parcels by the field "address").  Each project consisted of one or more stormwater control measures (see table SCMs below) that may overflow independently to the drainage network, or be connected to each other in a treatment train. Most projects were constructed as part of a single project with an identifiable cost. The only exception were small kerb-cut raingarden projects that were commissioned by Yarra Ranges Council in groups, often across multiple road parcels. For these projects, stormwater control measures in each project were grouped by parcel into separate projectIDs and their cost estimated proportionally. Several properties had more than one project constructed over the study period.  
+The `r dim(scmProjects)[1]` stormwater control projects in the two experimental catchments, identified by a unique "projectID", were discrete, identifiable projects on a single parcel (matched to table parcels by the field "address").  Each project consisted of one or more stormwater control measures (see table SCMs below) that may overflow independently to the drainage network, or be connected to each other in a treatment train. Most projects were constructed as part of a single project with an identifiable cost. The only exception were small kerb-cut raingarden projects that were commissioned by Yarra Ranges Council in groups, often across multiple road parcels. For these projects, stormwater control measures in each project were grouped by parcel into separate projectIDs and their cost estimated proportionally. (Cost data were removed from the dataset for this paper.) Several properties had more than one project constructed over the study period.  
 
 Each project was associated with a "round" with the following possible values:  
 
@@ -324,9 +335,9 @@ Each project was associated with a "round" with the following possible values:
 
 - '2', the second round of engagement in the Little Stringybark Creek project funded by a reverse, rising-clock, uniform-price auction [@bos_brown_2015];  
 
-- '3', the third round of engagement in the Little Stringybark Creek project funded by offering standardised stormwater treatment systems free of charge, with maximum cost set by rounds 1 and 2 [@bos_brown_2015];  
+- '3', the third round of engagement in the Little Stringybark Creek project funded by offering standardised stormwater treatment systems free of charge to properties in pipe subcatchments with no possibility of end-of-pipe SCMs, with maximum cost set by rounds 1 and 2 [@bos_brown_2015];  
 
-- '4', the fourth round of engagement in the Little Stringybark Creek project funded by ...Darren is going to need to remind me...  
+- '4', an extension of the third round of engagement in the Little Stringybark Creek project;  
 
 - 'D', demonstration projects conducted in the early stages of the Little Stringybark Creek project;  
 
@@ -340,7 +351,7 @@ Each project was associated with a "round" with the following possible values:
  
 - 'PL', large stormwater control systems on public land, mostly installed and operated by Yarra Ranges Council (one on a school property), collecting runoff from all impervious surfaces upstream of their subcatchments (identified by pipeID).  
 
-The scmProject table lists each "projectID", "address" (matched to the parcels table, except for large public systems that drain more than one property), "round", "installDate" (the date of installation), "pipeID" (matched to table subcs), and "parcelID" (matched to table parcels).  Finally the table also includes three elements of the cost of each project: "costProject", the cost (in Australian dollars) to the project (administered through the University of Melbourne); "costGovt", any government rebates claimable by the landholder for the installed SCM; and "costOwner", any cost born by the owner of the property.  
+The scmProject table lists each "projectID", "round", "installDate" (the date of installation), "pipeID" (matched to table subcs), and "parcelID" (matched to table parcels).  
 
 ### Table SCMs  
 
@@ -354,7 +365,7 @@ Each SCM also has a 'nextds', which takes the value of one of:
 
 - the "scmID" of another SCM to which the SCM overflows.  
 
-The SCMs table also lists the fields "address" (matched to table parcels), "round" (matched to table scmProjects), "dbName" (a meaningful descriptor for some SCMs), projectID (matched to table scmProjects), pipeID (matched to table subcs), and parcelID (matched to table parcels).  The three types of SCMs have different sets of specification parameters required to model their performance, thus requiring separate specifications tables (downpipe diverters, dds; tanks and raingardens).  
+The SCMs table also lists the fields "round" (matched to table scmProjects), "dbName" (a meaningful descriptor for some SCMs), projectID (matched to table scmProjects), pipeID (matched to table subcs), and parcelID (matched to table parcels).  The three types of SCMs have different sets of specification parameters required to model their performance, thus requiring separate specifications tables (downpipe diverters, dds; tanks and raingardens).  
 
 ### Table dds  
 
@@ -399,11 +410,11 @@ The specifications of `r length(unique(scmChanges$scmID))` SCMs changed during t
 
 ### Table filtprofs  
 
-The filtprofs table lists profiles of hydraulic conductivity measured in 12 locations around the Little Stringybark Creek catchment (Fig. S`r fig_no`) and the mean, default profiles used in estimating performance in raingardens in other locations in the LSC catchment and in the Dobsons Creek catchment.  For each profile (identified by "filtprofFile"), the profile to 1-m depth was split into strata (specified by the lowest depth of each stratum, "depth_m") of different hydraulic conductivity ("Ks_mm_h").  The table also has a porosity field, but this is not used in calculations, as the specification of filter medium in modelling raingardens is used to determine porosity.
+The filtprofs table lists profiles of hydraulic conductivity measured in 12 locations around the Little Stringybark Creek catchment (Fig. S`r fig_no + 1`) and the mean, default profiles used in estimating performance in raingardens in other locations in the LSC catchment and in the Dobsons Creek catchment.  For each profile (identified by "filtprofFile"), the profile to 1-m depth was split into strata (specified by the lowest depth of each stratum, "depth_m") of different hydraulic conductivity ("Ks_mm_h").  The table also has a porosity field, but this is not used in calculations, as the specification of filter medium in modelling raingardens is used to determine porosity.
 
-The substantial small-scale variability among the measured soil profiles made accurate prediction of soil hydraulic conductivity impossible. Following review of the variability among sites, a mean soil profile was developed as the default value for the Little Stringybark Creek catchment. This profile was used to model raingarden performance for all raingardens, except for those for which on-site measurements of hydraulic conductivity had been made (Fig. S3-5).  The default used in this paper differed from earlier performance calculations [e.g. @fletcher_etal_2011], having a more gradual decline in hydraulic conductivity with depth than the original default, and a higher hydraulic conductivity at the maximum depth (0.1 mm/h vs 0.005 mm/h).  This resulted in increased estimated infiltration rates and filtered volume indices, although differences in the final estimates of performance and environmental benefit were small.  
+The substantial small-scale variability among the measured soil profiles made accurate prediction of soil hydraulic conductivity impossible. Following review of the variability among sites, a mean soil profile was developed as the default value for the Little Stringybark Creek catchment. This profile was used to model raingarden performance for all raingardens, except for those for which on-site measurements of hydraulic conductivity had been made (Fig. S`r fig_no + 1`).  The default used in this paper differed from earlier performance calculations [e.g. @fletcher_etal_2011], having a more gradual decline in hydraulic conductivity with depth than the original default, and a higher hydraulic conductivity at the maximum depth (0.1 mm/h vs 0.005 mm/h).  This resulted in increased estimated infiltration rates and filtered volume indices, although differences in the final estimates of performance and environmental benefit were small.  
 
-In the Dobsons Creek catchments, the mean filter profile from multiple hydraulic conductivity tests around the Wicks bioinfiltration system were used for all raingardens.  
+In the Dobsons Creek catchments, the mean filter profile from multiple hydraulic conductivity tests around the Wicks bioinfiltration system [@bonneau_etal_2020] were used for all raingardens.  
 
 ```{r filtprof_map, echo=FALSE, warning = FALSE, message=FALSE, fig.width = 6,  fig.height = 8}
 fig_no <- fig_no + 1
@@ -449,7 +460,7 @@ title(ylab = "Depth (m)", line = -2)
 
 #### Fig. S`r fig_no`. The default mean profile of soil hydraulic conductivity used for most raingardens in the Little Stringybark catchment (mtev.default, light blue dots on map), and the measured profiles used for raingardens at the measurement sites (colours of points match the profile curves).
 
-## Hydrologic data used for SCM modelling  
+### Hydrologic data used for SCM modelling  
 
 The Environmental Benefit Index (EB) standard calculation used in all engagement rounds to assess the cost per EB used a standard single (average) year of data from the nearby Croydon rain gauge (No. 086234, www.bom.gov.au), 1 April 1965 to 31 March 1966.  The SCM model functions used by the EB calculator [https://tools.thewerg.unimelb.edu.au/EBcalc/, @fletcher_etal_2011] used two tables:  
 
@@ -457,11 +468,30 @@ The Environmental Benefit Index (EB) standard calculation used in all engagement
 
 - a similarly structured hourly series.
 
-We made minor modifications to original model function code (tankmodel.R and gardenmodel.R) used by the EB calculator (now in the file "code/modelfunctions2017.R"), and have simplified the storage of the Croydon 1965-66 data. The hourly table is now saved in the RData file "Croydon_1966_hourly_rain_runoff_et.rda", and is compiled for EB calculations into a list containing an hourly and a daily time-series table, using the function "prepare_runoff_data()".
+We made minor modifications to original model function code (tankmodel.R and gardenmodel.R) used by the EB calculator (now in the file "code/modelfunctions2017.R"), and have simplified the storage of the Croydon 1965-66 data. The hourly table is now saved in the Rdata file "Croydon_1966_hourly_rain_runoff_et.rda", and is compiled for EB calculations into a list containing an hourly and a daily time-series table, using the function "prepare_runoff_data()".
 
 We used the Croydon 1965-66 data to calculate series of EB and its variants.  To calculate fluxes of water over the study period, we compiled the recorded rainfall, runoff and evapotranspiration data for the full period (see S2) into two tables with the same structure for each of L4-e and D4-e (saved as "lsc_dbs_rain_hourly.rda").
 
-## Calculation of EI and water fluxes in study subcatchments
+To illustrate how change in EB over time corresponds to modelled change in water flows out of SCMs in S4, we used an hourly series (2000-2019) of rainfall and evapotranspiration data for the L4 catchment.  The rainfall data were aggregated from 6-min-interval areal rainfall data across the catchment estimated for the study period at 6-min intervals using a combination of 6-min (or less) data from the Melbourne Water Mt Evelyn gauge (229690A: https://www.melbournewater.com.au/water/rainfall-and-river-levels#/), four gauges that we installed installed over different periods in the catchment), ), and the BoM daily rainfall grid (http://www.bom.gov.au/climate/how/newproducts/IDCdrgrids.shtml).  
+
+The BoM grid is computed using an optimised Barnes successive correction technique that applies a weighted averaging process to the station data, where each grid-point represents an approximately square area with sides of about 5 km (0.05°). Daily rainfall for each catchment was extracted from the nearest grid cell, and disaggregated using the temporal pattern of sub-daily rain gauge data from nearby gauges. The gridded daily totals were assumed to be a more accurate estimate of rainfall than daily totals from the nearest gauge. Daily gridded data with totals <0.2 mm were set to zero as they correspond to less than a single tip of a rain gauge.
+
+A composite 6-min time series was generated by selecting the best quality gauge data in a sequential order of preference, using successively more distant gauges to infill missing/unreliable data in the preceding dataset. The resultant 6-min composite gauge data was then used to disaggregate the daily totals of each catchment.  
+
+A different disaggregation approach was used depending on the available data. Each rainfall estimate was classified by the approach used as one of the following:  
+
+- zeroTotal: The gridded daily total = 0. Every record for the day was set to zero even if the gauge data total > 0.  
+
+- temporal: The gridded daily total > 0 and there were no missing values in the gauge data. The daily total was disaggregated using the temporal pattern of the gauge data.  
+
+- semiTemporal: The gridded daily total > 0 and there were missing values in the gauge data, but the total gauge data was >= 70% of the gridded daily total. The daily total is disaggregated using the temporal pattern of the gauge data.  
+
+- mid-point: The gridded daily total > 0 and a) there were missing values in the gauge data and the total gauge data was < 70% of the gridded daily total or b) gauge data = 0. The daily total was attributed to the mid-point of the rain day (i.e. 2100 h).  
+
+Mean potential evapotranspiration across the catchment was estimated for the study period at 6-min intervals using the daily Morton’s potential evapotranspiration (PET) grid from the Scientific Information for Land Owners (SILO) database of historical climate records for Australia (https://www.longpaddock.qld.gov.au/silo/index.html). The grid was of the same spatial resolution as the BoM grid, and the daily PET value was extracted from the nearest grid cell.
+Daily PET values were disaggregated to a 6-min interval using the temporal pattern of one-minute solar radiation data from BoM Station 086282 (Melbourne Airport: http://www.bom.gov.au/climate/data/oneminsolar/about-IDCJAC0022.shtml#service). The cosine of the sun’s zenith distance (i.e. the angular distance from directly overhead) was considered to be a good approximation for the distribution of ET throughout the day [@kumar_etal_2000].  
+
+### S4. Calculation of EI and water fluxes in study subcatchments
 
 The primary aim of our analysis was to quantify changes over time in effective imperviousness (and variants based on EB scores of SCMs) and fluxes of impervious runoff in each of the six experimental subcatchments, accounting for changes in impervious coverage and the installation and operation of SCMs in each subcatchment. Over time, effective impervious coverage varied as buildings and paving were constructed, demolished or connected to the drainage network; SCMs were installed, decommissioned or their specifications were altered; relationships between SCMs changed as SCMs in treatment trains came on line; and in two cases, when large-scale SCMs diverted runoff from an upstream subcatchment (King Street Upper, and The Entrance raingardens) relationships between subcatchments changed.  The upstream-downstream relationships between SCMs are illustrated in Fig. S`r fig_no + 1` for a point in time after all SCMs were installed, but such maps differed over the study period.
 
@@ -561,7 +591,7 @@ knitr::include_graphics("images/functions_diag.pdf")
 
 #### Fig. S`r fig_no`. Primary functions in BACRIfunctions.R (and modelfunctions2017.R in the case of tankmodel and gardenmodel) and the flow of calculations to achieve the primary outputs of budget_subc_time_series and EI_subc_time_series.  
 
-## Example calculations
+### Example calculations
 
 The following uses `r subcs$pipeName[subcs$pipeID == example_pipeID]` subcatchment (pipeID = `r example_pipeID`) as an example for calculating subcatchment EB, EI and water fluxes.  
 
@@ -569,9 +599,10 @@ The following uses `r subcs$pipeName[subcs$pipeID == example_pipeID]` subcatchme
 "It is a small catchment with a mix of connected and unconnected impervious surfaces (roofs and roads), with a treatment train of tanks and raingardens on each of two properties, with all impervious surfaces draining to a series of raingardens at the bottom of the catchment before entering Little Stringybark Creek North.  This permits a nested series of examples, with and without the terminal series of raingardens (Fig. S9).",
 paste("The original version of this document used pipeID 29, Wattle Valley Rd North, as a simple example.  Changing the value of example_pipeID makes the example potentially more complex. The explanatory text in this document may not fully apply to pipeID",example_pipeID))`.
 
-
-```{r figS3_8, fig.width=5, fig.height=5}
+```{r echo=FALSE}
 fig_no <- fig_no + 1
+```
+```{r figS3_8, fig.width=5, fig.height=5}
 scmMap(example_pipeID)  #Mapping function in BACRIfunctions.R
 box()
 ```
@@ -582,9 +613,10 @@ We begin by demonstrating the two primary functions for calculating time series 
 
 Time series of EI variants and of modelled flows over the length of the study can simply be calculated and plotted using code shown below for Figs. S`r fig_no` and S`r fig_no  + 1`.  For this small catchment, the EI calculation (Fig. S`r fig_no`) took ~20 s, and the water flux calculation (Figs. S`r fig_no`) took ~90 s.  Calculations for larger sub-catchments take between 2 (L1-e) and 50 min (L4-e).   
 
-```{r figS3_9, fig.width=6, fig.height=3}
+```{r echo=FALSE}
 fig_no <- fig_no + 1
-#' Croydon rainfall-runoff data (recompiled version of Croydon.RData used by modelfunctions to calculate the EB index).
+```
+```{r figS3_9, fig.width=6, fig.height=3}
 Croydon <- prepare_runoff_data(get(load(paste(here::here("data"), 
                         "/Croydon_1966_hourly_rain_runoff_et.rda", sep = ""))))
 ei_29 <- EI_subc_time_series(29)
@@ -592,11 +624,13 @@ plotlEItrends(ei_29$iats, legend = TRUE, "topleft", cex = 0.8)
 title(ylab = "Effective imperviousness variant (%)", xlab = "Date", cex.lab = 0.75)
 ```
 
-#### Fig. S`r fig_no`. Time series plot of six effective impervious variants for example subcatchment (`r subcs$pipeName[subcs$pipeID == example_pipeID]`). Variant codes correspond to the EI subscripts used in the main paper.  
+#### Fig. S`r fig_no`. Time series plot of six effective impervious variants for example subcatchment (`r subcs$pipeName[subcs$pipeID == example_pipeID]`). Variant codes correspond to the EI subscripts used in the main paper.
 
-```{r figS3_10, fig.width=7, fig.height=5, dev = "png", dpi = 300}
+```{r echo=FALSE}
 fig_no <- fig_no + 1
-load(here("data","lsc_dbs_rain_hourly.rda"))
+```
+```{r figS3_10, fig.width=7, fig.height=5, dev = "png", dpi = 300}
+load(here("data","lsc_rain_hourly.rda"))
 lsc_rain_hourly$runoff_mm <- lose.init(lsc_rain_hourly$rain_mm,0.256,2)
 lsc_runoff <- prepare_runoff_data(lsc_rain_hourly) 
 #system.time(
@@ -613,33 +647,30 @@ with(budget_29$hourly[date > "2018-01-01"], lines(date, ei_scm_runoff/carea, col
 
 ```
 
-#### Fig. S`r fig_no`. Time series of modelled impervious runoff from example subcatchment (`r subcs$pipeName[subcs$pipeID == example_pipeID]`): a) Daily flows over the full study period, b) Hourly flows for a detail of 1 year. Black lines show total impervious runoff and red lines show impervious runoff leaving the catchment after flowing through SCMs
+#### Fig. S`r fig_no`. Time series of modelled impervious runoff from example subcatchment (`r subcs$pipeName[subcs$pipeID == example_pipeID]`): a) Daily flows over the full study period, b) Hourly flows for a detail of 1 year. Black lines show total impervious runoff and red lines show impervious runoff leaving the catchment after flowing through SCMs.  
 
-The non-linear trend in EI (Fig. S`r fig_no - 1`) in this small catchment is because, prior to 2006, Wattle Valley Road was unsealed, and the impervious surfaces of the catchment drained to the stream informally or along the roadside swale (and thus considered non-effective). In 2006, the road was sealed and curbed, with stormwater drainage connecting the road and houses of the subcatchment to the stream.  SCMs installed in the project progressively reduced that connection, culminating in the construction of a large raingarden at the bottom of the subcatchment in 2012, which captured runoff from all subcatchment impervious surfaces.  
+The non-linear trend in EI (Fig. S`r fig_no - 1`) in this small catchment is because, prior to 2006, Wattle Valley Road was unsealed, and the impervious surfaces on properties of the subcatchment drained to the stream informally or along the roadside swale (and thus considered non-effective). In 2006, the road was sealed and curbed, with stormwater drainage connecting the road and houses of the subcatchment to the stream.  SCMs installed in the project progressively reduced that connection, culminating in the construction of a large raingarden at the bottom of the subcatchment in 2012, which captured runoff from all subcatchment impervious surfaces.  
 
-Fig. S`r fig_no`a shows the models assume no impervious runoff from the catchment before sealing and piping of Wattle Valley Road in 2006, and a reduction in impervious runoff leaving the catchment following installation of SCMs in the catchmnent. Fig. SS`r fig_no`a, shows that the frequency of overflow from the terminal SCM in this catchment was reduced to ~12 rain events per year, which is sufficient for the runoff frequency (RO) sub-index to achieve a perfect score, leading to EI~RO~ being near-zero in Fig. `r fig_no`a.
+Fig. S`r fig_no`a shows the models assume no impervious runoff from the subcatchment before sealing and piping of Wattle Valley Road in 2006, and a reduction in impervious runoff leaving the catchment following installation of SCMs in the subcatchmnent. Fig. SS`r fig_no`a, shows that the frequency of overflow from the terminal SCM in this subcatchment was reduced to ~12 rain events per year, which is sufficient for the runoff frequency (RO) sub-index to achieve a perfect score, leading to EI~RO~ being near-zero in Fig. `r fig_no`a.  
 
-### Under the hood of the EI_subc_time_series and budget_subc_time_series functions
+### Logic and use of the EI_subc_time_series and budget_subc_time_series functions
 
-For every SCM, a budget of water fluxes is calculated using a time series of rainfall, impervious runoff and potential evapotransipiration, prepared using the *prepare_runoff_data* function (Fig. S`r fig_no - 4`).  The three types of SCM have separate functions for calculating budgets.  *calcRGBudget* and *calcTankBudget* adapt the *gardenmodel* and *tankmodel* functions, respectively (in modelfunctions2017.R, used by the EB calculator, https://tools.thewerg.unimelb.edu.au/EBcalc/, @fletcher_etal_2011), to permit specification parameters to be read from the database tables, "tanks" and "raingardens". *calcDDBudget* uses a simple look-up table to model the largely ineffective downpipe diverters that were installed in the Dobsons Creek catchment.  
+For every SCM, a budget of water fluxes is calculated using a time series of rainfall, impervious runoff and potential evapotransipiration, prepared using the `prepare_runoff_data` function (Fig. S`r fig_no - 3`): for EB calculations this series is the standard 1965-1966 Croydon rainfall year (see S3), while for budget calculations it is the observed rainfall during the period of SCM changes being modelled. The three types of SCM have separate functions for calculating budgets.  `calcRGBudget` and `calcTankBudget` adapt the `gardenmodel` and `tankmodel` functions, respectively (in modelfunctions2017.R, used by the EB calculator, https://tools.thewerg.unimelb.edu.au/EBcalc/, @fletcher_etal_2011), to permit specification parameters to be read from the database tables, "tanks" and "raingardens". `calcDDBudget` uses a simple look-up table to model the largely ineffective downpipe diverters that were installed in the Dobsons Creek catchment.  
 
-The *budget_scm_on_datex* function calculates the budget for a specified SCM (scmID) on a specified date (datex).  The appropriate input data are compiled using *data_on_datex*.  This function, subsets the database data to those elements of relevance to scmID, and adjusts specifications for datex, including ensuring that the network of SCMs upstream of scmID (if any) are correctly specified through the "nextds" field of the SCMs table.  The function then uses the three 'calc__Budget' functions as needed to calculate budgets for all upstream SCMs to ensure correct inflow into scmID, and finally calculates the budget for scmID on datex.
+The `budget_scm_on_datex` function calculates a time series of water fluxes (i.e. a budget) into and out of an SCM (specified by scmID) given its specifications (including inflows from upstream SCMs) on a specified date (datex).  The appropriate input data are compiled using `data_on_datex`.  This function, subsets the database data to those elements of relevance to scmID, and adjusts specifications for datex, including ensuring that the network of SCMs upstream of scmID (if any) are correctly specified through the "nextds" field of the SCMs table.  The function then uses the three `calc_..._Budget` functions as needed to calculate budgets for all upstream SCMs to ensure correct inflow into scmID, and finally calculates the budget for scmID on datex.  
 
-The time series of the budget produced by *budget_scm_on_datex* depends on whether the output is to be used to calculate EB (and therefore EI variants) or to be used to calculate the budget for a specified time period (a decision specified by the "specs_for_EB" argument).  If EB is to be calculated, the function uses the 1-year Croydon 1965-1966 rainfall time series (and each SCM is assumed to be half-full at the start of the time series). The function *EB_scm_on_datex* takes this output and calculates EB index and its sub-indices for scm on datex.
+The time series of the budget produced by `budget_scm_on_datex` depends on whether the output is to be used to calculate EB (and therefore EI variants) or to be used to calculate the budget for a specified time period (a decision specified by the "specs_for_EB" argument).  If EB is to be calculated, the function uses the 1-year Croydon 1965-1966 rainfall time series (and each SCM is assumed to be half-full at the start of the time series). The function `EB_scm_on_datex` takes this output and calculates EB index and its sub-indices for scmID on datex.  
 
-If the required output is a budget, then the output budget time series matches the time series of the input runoff data, which can be of any length of at least 1 day.  This is to permit calculation of budgets in periods between changes in SCM specifications: in such cases, the starting volume of store in each SCM equals the final store volume in the previous run.  Such a series of SCM budget calculations is calculated with the function *budget_scm_time_series*.  This function uses *data_for_scm* to determine all the dates on which specifications relevant to scmID occurred, and runs *budget_scm_on_datex* in a loop for each date to build up an hourly series of flows into and out of the scm and daily time series of all elements of the water budget for the scm.
+If the required output is a budget, then the output budget time series matches the time series of the input runoff data, which can be of any length of at least 1 day.  This is to permit calculation of budgets in periods between changes in SCM specifications: in such cases, the starting volume of store in each SCM equals the final store volume in the previous run.  Such a series of SCM budget calculations is calculated with the function `budget_scm_time_series`.  This function uses `data_for_scm` to determine all the dates on which specifications relevant to scmID occurred, and runs `budget_scm_on_datex` in a loop for each date to build up an hourly series of flows into and out of the scm and daily time series of all elements of the water budget for the scm.  
 
-If a time series of EB statistics is required, then *EB_scm_time_series* works through a similar process of identifying change dates of relevance and uses *EB_scm_on_datex* to calculate EB statistics on each change date.
+If a time series of EB statistics is required, then `EB_scm_time_series` works through a similar process of identifying change dates of relevance and uses `EB_scm_on_datex` to calculate EB statistics on each change date.  
 
-The *ia_ts* function is used to serve as a template output for the two *_subc_time_series* functions: a time series of total impervious area (tia) and effective impervious area (eia) for the nominated subcathment (pipeID). 
+The `ia_ts` function is used to serve as a template output for the two `_subc_time_series` functions: a time series of total impervious area (tia) and effective impervious area (eia) for the nominated subcathment (pipeID).  
 
-*EI_subc_time_series* and *budget_subc_time_series* both start by identifying all dates on which terminal SCMs (those SCMs with no other SCMs downstream) changed in pipeID.  For each such date, *EI_subc_time_series* calculates the EB statistics for each terminal SCM and divides each index by the maximum potential EB for that SCM (impervious area x 100) to get the EIA (effective impervious area) variant for that SCM. EIA variants for each date are calculated by summing EIA for all terminal SCMs and the subcatchment effective impervious area not treated by any SCM. EI is then calculated for each date by dividing by the subcatchment area.  The statistics for each day are added to the output from *ia_ts* (e.g. Fig. S3-9).
+`EI_subc_time_series` and `budget_subc_time_series` both start by identifying all dates on which terminal SCMs (those SCMs with no other SCMs downstream) changed in pipeID.  For each such date, `EI_subc_time_series` calculates the EB statistics for each terminal SCM and divides each index by the maximum potential EB for that SCM (impervious area x 100) to get the EIA (effective impervious area) variant for that SCM. EIA variants for each date are calculated by summing EIA for all terminal SCMs and the subcatchment effective impervious area not treated by any SCM. EI is then calculated for each date by dividing by the subcatchment area.  The statistics for each day are added to the output from `ia_ts` (e.g. Fig. `r fig_no - 1`).  
 
-For each change date, *budget_subc_time_series* uses *budget_scm_time_series* to calculate a time series of water fluxes from each terminal SCM for the period until the next change date. It loops through each SCM, subtracting the impervious area treated by the SCM at each time step from the eia as estimated by *ia_ts*, and adding the time series of flow components passing through each SCMs together. Once budgets for all terminal SCMs have been calculated, impervious runoff from the untreated impervious surfaces of the subcatchment is added to outflows from the SCMs to produce two flow series (total impervious runoff, ei_runoff, and impervious runoff reaching the subcatchment outlet having passed through SCMs, ei_scm_runoff, see Fig. S`r fig_no`)
+For each change date, `budget_subc_time_series` uses `budget_scm_time_series` to calculate a time series of water fluxes from each terminal SCM for the period until the next change date. It loops through each SCM, subtracting the impervious area treated by the SCM at each time step from the eia as estimated by `ia_ts`, and adding the time series of flow components passing through each SCMs together. Once budgets for all terminal SCMs have been calculated, impervious runoff from the untreated impervious surfaces of the subcatchment is added to outflows from the SCMs to produce two flow series (total impervious runoff, ei_runoff, and impervious runoff reaching the subcatchment outlet having passed through SCMs, ei_scm_runoff, see Fig. S`r fig_no`).  
 
-
-### yet to revise...
-For Little Stringybark Creek and Dobsons Creek catchments, impervious runoff volume following each rain event (see S2 for derivation of rain events) at each of the study sites was estimated from the hourly impervious runoff data, and for other catchments, from the temporal trend in EI multiplied by impervious runoff estimated from rainfall.  In all cases, 4 times the stream length in the catchment was added to the catchment EIA, to account for direct rainfall on stream channels (assuming a mean channel width of 4 m). This addition had minimal effect on estimates of runoff in all but the reference catchments, which had very little or no EIA.  
 
 ##### page break  
 
