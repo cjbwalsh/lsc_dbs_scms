@@ -29,6 +29,8 @@ Table 1.
 load(here::here("data","ei_ts.rda"))
 ei_fin <- rbind(tail(ei_101$iats,1),tail(ei_103$iats,1),tail(ei_53$iats,1),
                 tail(ei_36$iats,1),tail(ei_74$iats,1),tail(ei_71$iats,1))
+budget_fin <- rbind(tail(ei_101$budget_ts,1),tail(ei_103$budget_ts,1),tail(ei_53$budget_ts,1),
+                tail(ei_36$budget_ts,1),tail(ei_74$budget_ts,1),tail(ei_71$budget_ts,1))
 cat_stats <- data.frame(pipeID = c(101,103,53,36,74,71),
                         site = c("DBS0004","DBS0008","LSN0001","LSS0001","LIS0001","LIS0004"),
                         cat = c("D4","D8","Ln","Ls","L1","L4"),
@@ -37,11 +39,23 @@ cat_stats <- data.frame(pipeID = c(101,103,53,36,74,71),
                         ei_s1 = round(100 * ei_fin$ei, 1),
                         ia_treated_ha = round(1e-4 * ei_fin$carea * (ei_fin$ei - ei_fin$s) / ei_fin$ei),
                         ia_treated_perc = round(100 * (ei_fin$ei - ei_fin$s) / ei_fin$ei,1),
-                        vol_reduced_L = NA,
-                        vol_reduced_perc = NA,
-                        vol_filtered_L = NA,
-                        vol_filtered_perc = NA,
+                        vol_reduced_ML = round((budget_fin$V_u - budget_fin$V_m) * 1e-6),
+                        vol_reduced_perc = round(100* (budget_fin$V_u - budget_fin$V_m) / budget_fin$V_u,1),
+                        vol_filtered_L = round(budget_fin$F_m * 1e-6),
+                        vol_filtered_perc = round(100* (budget_fin$F_m) / budget_fin$V_u,1),
                         stringsAsFactors = FALSE)
+SCMs$subc <- subcs$trib[match(SCMs$pipeID,subcs$pipeID)]
+scmProjects$subc <- subcs$trib[match(scmProjects$pipeID,subcs$pipeID)]
+for(i in 1:6){
+  allSCMs <- SCMs$scmID[SCMs$subc == cat_stats$site[i]]
+  allSCMs <- allSCMs[!allSCMs %in% scmsDecommissioned$scmID]
+  cat_stats$n_scms[i] <- length(allSCMs)
+  cat_stats$n_scm_projects[i] <- length(scmProjects$projectID[scmProjects$subc == cat_stats$site[i]])
+}
+cat_stats$n_scms[cat_stats$cat == "D8"] <- sum(cat_stats$n_scms[cat_stats$cat %in% c("D4","D8")])
+cat_stats$n_scm_projects[cat_stats$cat == "D8"] <- sum(cat_stats$n_scm_projects[cat_stats$cat %in% c("D4","D8")])
+cat_stats$n_scms[cat_stats$cat == "L4"] <- sum(cat_stats$n_scms[cat_stats$cat %in% c("L4","L1","Ln","Ls")])
+cat_stats$n_scm_projects[cat_stats$cat == "L4"] <- sum(cat_stats$n_scm_projects[cat_stats$cat %in% c("L4","L1","Ln","Ls")])
 
 table_for_word(cat_stats, pgwidth = 6.69)
 ```
