@@ -378,7 +378,7 @@ data_on_datex <- function(pipeID, datex){
       polyi$surfType <- "roof" #almost always true. not important for ei calcs
       polyi <- polyi[c("polyID","pipeID","conn","nextds","area_m2",
                        "parcType","surfType","constructionDate","parcelID")] #see above if... #,"geometry")]
-      iax <- rbind(iax, polyi)
+      iax <- rbind(iax[names(iax) != "subc"], polyi)
     }
     }
   pcx_demolitions <- pcx[pcx$changeType == "demolition",]
@@ -455,8 +455,8 @@ data_on_datex <- function(pipeID, datex){
     #the nextds field in the ia table.
     raingardensx$impCarea[raingardensx$scmID == "RPNR502"] <- sum((iax$area_m2*iax$conn)[!is.na(iax$nextds) & iax$nextds == "RPNR502"])
     #5c. If there are any public SCMs that capture all pipeID impervious runoff
-    #upstream, then adjust their catchment areas to account for SCMs upstream
-    PLs <- scmProjects[scmProjects$round %in% c("PL","DBS KCC raingardens"),]
+    #upstream (PLs), then adjust their catchment areas to account for SCMs upstream
+    PLs <- scmProjects[scmProjects$round %in% c("PL","DBS KCC raingardens") & is.na(scmProjects$parcelID),]
     PLs <- PLs[!PLs$projectID %in% c("PL-8-Pembroke (Morrisons Reserve)",
                                      "PL-24-Petrol Station"),]
     # 3 PLs with SCM receiving all pipeID runoff not the most upstream SCM
@@ -520,8 +520,8 @@ data_on_datex <- function(pipeID, datex){
 #' # db29 <- data_on_datex(29, "2018-01-01")
 
 data_for_scm <- function(scmID, fin_date = "2019-12-31"){
-  #1. PL scms
-  PLs <- scmProjects[scmProjects$round %in% c("PL","DBS KCC raingardens"),]
+  #1. PLs = public SCMs that capture all pipeID impervious runoff upstream
+  PLs <- scmProjects[scmProjects$round %in% c("PL","DBS KCC raingardens") & is.na(scmProjects$parcelID),]
   scmi <- SCMs[SCMs$scmID == scmID,]
   if(scmi$projectID %in% PLs$projectID){
     allusi <- allupstream(subcs, scmi$pipeID, "pipeID")
@@ -1467,11 +1467,6 @@ EB_scm_on_datex <- function(scmID,
 #' @param datex date of interest "YYYY-MM-DD"
 #' @param runoffData rainfall and runoff time series used for EB calculation. 
 #'     Default is Croydon loaded above.
-#' @param upstream_scm_results if pipeID is downstream of other subcatchments 
-#'     for which this function has already been calculated, this argument can be
-#'     populated with a list of the output objects, and their EBs will not be 
-#'     recalculated, but will be used to calculate EB for pipeID.  Default is 
-#'     NULL (no previously calculated upstream results will be used)
 #' @param ... arguments to EB_scm_on_datex()
 #' @return A list of:
 #'     scm_stats, data.frame of results of EB_scm_on_datex() for all terminal 
@@ -1499,64 +1494,29 @@ EB_scm_on_datex <- function(scmID,
 #' # EB_pipeID_53 <- EB_subc_on_datex(53,"2016-01-01") #LSN0001: ~1 min
 #' # EB_pipeID_74 <- EB_subc_on_datex(74,"2016-01-01") #LIS0001: ~1 min
 #' # EB_pipeID_36 <- EB_subc_on_datex(36,"2016-01-01") #LSS0001: ~2.2 mins
-#' # EB_pipeID_71 <- EB_subc_on_datex(71,"2016-01-01",
-#' #                          upstream_scm_results = list(EB_pipeID_53,
-#' #                                                      EB_pipeID_74,
-#' #                                                      EB_pipeID_36)) #LIS0004:~5.3 mins
+#' # EB_pipeID_71 <- EB_subc_on_datex(71,"2016-01-01") #LIS0004:~5.3 mins
 #' # EB_pipeID_101 <- EB_subc_on_datex(101,"2016-01-01") #DBS0004: ~35 s
-#' # EB_pipeID_103 <- EB_subc_on_datex(103,"2016-01-01",
-#' #                                  upstream_scm_results = list(EB_pipeID_101)) #DBS0008: ~1 min
+#' # EB_pipeID_103 <- EB_subc_on_datex(103,"2016-01-01") #DBS0008: ~1 min
 #' # t(unlist(EB_pipeID_103[-1]))
 #' # save(EB_pipeID_53,EB_pipeID_74,EB_pipeID_36,EB_pipeID_71,
 #' # EB_pipeID_101, EB_pipeID_103, file = "compiled_objects/EB_mainsites_2016-01-01.rda", compress = "xz")
 
 EB_subc_on_datex <- function(pipeID, datex, 
-                             upstream_scm_results = NULL, 
                              runoffData = Croydon, ...){
   db <- data_on_datex(pipeID, datex)
   carea <- db$subcs$carea[db$subcs$pipeID == pipeID]
   terminal_scms <- db$SCMs[is.na(db$SCMs$nextds) | db$SCMs$nextds == "land",]
-  #if upstream_scm_results are to be used, combine them into a single look-up table us_scms
-  if(!is.null(upstream_scm_results)){
-    for(i in 1:length(upstream_scm_results)){
-      if(i == 1){
-        us_scms <- upstream_scm_results[[1]]$scm_stats
-      }else{
-          us_scms <- rbind(us_scms,
-                           upstream_scm_results[[i]]$scm_stats)
-        }
-    }
-  }
   tia <- sum(db$ia$area_m2)
   eia <- sum(db$ia$area_m2*db$ia$conn)  # connected IA ignoring SCMs
   if(dim(terminal_scms)[1] > 0){
-    if(is.null(upstream_scm_results)){
-      x <- data.frame(scmID = terminal_scms$scmID[1], 
-                      t(unlist(EB_scm_on_datex(terminal_scms$scmID[1], db, runoffData))))  #, ...
-    }else{
-    if(!terminal_scms$scmID[1] %in% us_scms$scmID){
   x <- data.frame(scmID = terminal_scms$scmID[1], 
              t(unlist(EB_scm_on_datex(terminal_scms$scmID[1], db, runoffData))))  #, ...
-    }else{
-    x <- us_scms[us_scms$scmID == terminal_scms$scmID[1],]
-  }}
+  }
   if(dim(terminal_scms)[1] > 1){
     for(i in 2:dim(terminal_scms)[1]){
-      if(is.null(upstream_scm_results)){
         x <- rbind(x,
                    data.frame(scmID = terminal_scms$scmID[i], 
                       t(unlist(EB_scm_on_datex(terminal_scms$scmID[i], db, runoffData)))))  #, ...
-      }else{
-    if(!terminal_scms$scmID[i] %in% upstream_scm_results$scmID){
-      x <- rbind(x,
-                data.frame(scmID = terminal_scms$scmID[i],
-                           t(unlist(EB_scm_on_datex(terminal_scms$scmID[i], db, 
-                                                    runoffData)))))
-    }else{
-      x <- rbind(x,
-                 us_scms[us_scms$scmID == terminal_scms$scmID[i],])
-    }
-        }}
   }
   eia_scms <- sum(x$EB_max)*100         #IA draining to an SCM
   eia_s <- eia - eia_scms               #all ia draining to an SCM, W = 0
@@ -1653,11 +1613,6 @@ EB_scm_time_series <- function(scmID, start_date, fin_date){
 # EI_subc_time_series() ---------------------------------
 #' Calculate variants of EI for a subcatcatchment over a specified time series
 #' @param pipeID a value from table subcs identifying subcatchment of interest
-#' @param upstream_scm_results if pipeID is downstream of other subcatchments 
-#'     for which this function has already been calculated, this argument can be
-#'     populated with a list of the output objects, and their EBs will not be 
-#'     recalculated, but will be used to calculate EB for pipeID.  Default is 
-#'     NULL (no previously calculated upstream results will be used)
 #' @param start_date first date of time series as string "YYYY-MM-DD" (start date 
 #'    is assumed to be the installation date of the scm)
 #' @param fin_date last date of time series as string "YYYY-MM-DD" (start date 
@@ -1676,24 +1631,12 @@ EB_scm_time_series <- function(scmID, start_date, fin_date){
 #'     quality parameters not considered in the foundation paper
 #' @examples
 # system.time(ei_29 <- EI_subc_time_series(29)) #~8 s
-# system.time(ei_53 <- EI_subc_time_series(53, 
-#                     upstream_scm_results = list(ei_29))) #~31 min
+# system.time(ei_53 <- EI_subc_time_series(53)) #~31 min
 # system.time(ei_36 <- EI_subc_time_series(36)) #~59 min
 
 EI_subc_time_series <- function(pipeID, 
-                                upstream_scm_results = NULL, 
-                                start_date = "2001-01-01", 
-                                fin_date = "2019-12-31"){
-  if(!is.null(upstream_scm_results)){
-    us_EBs <- upstream_scm_results[[1]]$EBs
-    us_ntds <- upstream_scm_results[[1]]$non_term_dates
-    if(length(upstream_scm_results) > 1){
-      for(i in 2:length(upstream_scm_results)){
-        us_EBs <- rbind(us_EBs,upstream_scm_results[[i]]$EBs)
-        us_ntds <- upstream_scm_results[[i]]$non_term_dates
-      }
-    }
-  }
+                                start_date = as.Date("2001-01-01"), 
+                                fin_date = as.Date("2019-12-31")){
     if(start_date < "2001-01-01")
     stop("Earliest start date is '2001-01-01'", call. = FALSE)
   allusi <- allupstream(subcs, pipeID, "pipeID")
@@ -1711,16 +1654,10 @@ EI_subc_time_series <- function(pipeID,
     if(i == 1){
       terminal_scms <- db$SCMs$scmID[is.na(db$SCMs$nextds) | 
                                        db$SCMs$nextds == "land"]
-      if(!is.null(upstream_scm_results)){
-        terminal_scms <- terminal_scms[!terminal_scms %in% us_EBs$scmID]
-      }
     }
     if(i > 1){
       new_tcsms <- db$SCMs$scmID[is.na(db$SCMs$nextds) | 
                                  db$SCMs$nextds == "land"]
-      if(!is.null(upstream_scm_results)){
-        new_tcsms <- new_tcsms[!new_tcsms %in% us_EBs$scmID]
-      }
       non_terms <- terminal_scms[!(terminal_scms %in% new_tcsms)]
       non_terms <- non_terms[!non_terms %in% non_term_dates$scmID]
       if(length(non_terms) > 0){
@@ -1758,8 +1695,9 @@ if(length(non_term_dates$date[j]) != sum(scmsDecommissioned$scmID == non_term_da
   }
   # db <- data_on_datex(pipeID, fin_date)
   # carea <- db$subcs$carea[db$subcs$pipeID == pipeID]
-  iats <- ia_ts(pipeID, start_date = start_date, fin_date = fin_date)
-  iats$s <- iats$ro <- iats$vr <- iats$fv <- iats$eb <- iats$eia
+  iats <- budget_ts <- ia_ts(pipeID, start_date = start_date, fin_date = fin_date)
+  iats$s <- iats$ro <- iats$vr <- iats$fv <- iats$wq  <- iats$eb <- iats$eia
+  budget_ts$V_u <- budget_ts$V_m <- budget_ts$F_u <- 0
   for(i in 1:length(terminal_scms)){
     if(terminal_scms[i] %in% non_term_dates$scmID) {
       end <- non_term_dates$date[non_term_dates$scmID == terminal_scms[i]]
@@ -1767,48 +1705,23 @@ if(length(non_term_dates$date[j]) != sum(scmsDecommissioned$scmID == non_term_da
       end <- fin_date
     }
    EBi <- data.table::data.table(EB_scm_time_series(terminal_scms[i], start_date, end))
-    EBi_dates <- unique(c(EBi$date, end))
+   EBi_dates <- unique(c(EBi$date, end))
     for(j in 1:(length(EBi_dates)-1)){
       iats[iats$date > EBi_dates[j] & iats$date <= EBi_dates[j + 1],
-           c("s","ro","vr","fv","eb")] <- 
+           c("s","ro","vr","fv","wq","eb")] <- 
         iats[iats$date > EBi_dates[j] & iats$date <= EBi_dates[j + 1],
-             c("s","ro","vr","fv","eb")] - 
+             c("s","ro","vr","fv","wq","eb")] - 
         EBi[rep(j,sum(iats$date > EBi_dates[j] & iats$date <= EBi_dates[j + 1])),
-            c("EB_max","RO","VR","FV","EB")] * 100
+            c("EB_max","RO","VR","FV","WQ","EB")] * 100
+      # * 100 because the original EB score was scaled to 100 m2, this converts EB unit to m
     }
     if(i == 1)
       EBs <- EBi
     if(i > 1)
       EBs <- rbind(EBs, EBi)
   } 
-  if(!is.null(upstream_scm_results)){
-      new_ntds <- non_term_dates
-      new_EBs <- EBs
-      non_term_dates <- us_ntds
-      terminal_scms <- unique(as.vector(us_EBs$scmID))
-      EBs <- us_EBs
-      for(i in 1:length(terminal_scms)){
-        if(terminal_scms[i] %in% non_term_dates$scmID) {
-          end <- non_term_dates$date[non_term_dates$scmID == terminal_scms[i]]
-        }else{
-          end <- fin_date
-        }
-        EBi <- EBs[EBs$scmID == terminal_scms[i],]
-        EBi_dates <- unique(c(EBi$date, end))
-        for(j in 1:(length(EBi_dates)-1)){
-          iats[iats$date > EBi_dates[j] & iats$date <= EBi_dates[j + 1],
-               c("s","ro","vr","fv","eb")] <- 
-            iats[iats$date > EBi_dates[j] & iats$date <= EBi_dates[j + 1],
-                 c("s","ro","vr","fv","eb")] - 
-            EBi[rep(j,sum(iats$date > EBi_dates[j] & iats$date <= EBi_dates[j + 1])),
-                c("EB_max","RO","VR","FV","EB")] * 100
-        }
-      }
-      EBs <- rbind(new_EBs,EBs)
-      non_term_dates <- rbind(new_ntds, non_term_dates)
-  }
   carea <- iats$carea
-  cols <- c("tia","eia","eb","fv","vr","ro","s")
+  cols <- c("tia","eia","eb","wq","fv","vr","ro","s")
   iats[, (cols) := lapply(.SD, function(x) x/carea), .SDcols = cols]
   names(iats)[3:4] <- c("ti","ei")
   list(EBs = EBs, iats = iats, non_term_dates = non_term_dates)
@@ -2054,23 +1967,40 @@ budget_subc_time_series <- function(pipeID, runoffData){
 # plotlEItrends() ---------------------------------
 #' Plot output of budget_subc_time_series
 
-plotlEItrends <- function(pipeiTrend, legend = FALSE, ...) {
+plotlEItrends <- function(pipeiTrend, legend = FALSE, ylab = TRUE, xlab = TRUE, ...) {
   with(pipeiTrend, plot(date, log10(100*ei + 0.1),
                         type = 'l', ylim = c(-1,1.5), lty = 2,lwd = 2, axes = FALSE,
                         xlab = "", ylab = "", col = "black"))
-  with(pipeiTrend, lines(date, log10(100*eb + 0.1), col = "black"))
-  with(pipeiTrend, lines(date, log10(100*fv + 0.1), col = "orange"))
-  with(pipeiTrend, lines(date, log10(100*ro + 0.1), col = "red"))
-  with(pipeiTrend, lines(date, log10(100*vr + 0.1), col = "green"))
-  with(pipeiTrend, lines(date, log10(100*s + 0.1), col = "blue", lty = 3))
+  with(pipeiTrend, lines(date, log10(100*eb + 0.1), col = RColorBrewer::brewer.pal(7,"Set1")[1]))
+  with(pipeiTrend, lines(date, log10(100*fv + 0.1), col = RColorBrewer::brewer.pal(7,"Set1")[2]))
+  with(pipeiTrend, lines(date, log10(100*ro + 0.1), col = RColorBrewer::brewer.pal(7,"Set1")[3]))
+  with(pipeiTrend, lines(date, log10(100*vr + 0.1), col = RColorBrewer::brewer.pal(7,"Set1")[4]))
+  with(pipeiTrend, lines(date, log10(100*wq + 0.1), col = RColorBrewer::brewer.pal(7,"Set1")[5]))
+  with(pipeiTrend, lines(date, log10(100*s + 0.1), col = RColorBrewer::brewer.pal(7,"Set1")[7], lty = 3))
   axis(1, at=c(0,1577836800), labels=c("",""), lwd.ticks=0)
+  if(xlab){
   axis.Date(1, pipeiTrend$date,
-               at = seq.Date(lubridate::ymd("1995-01-01"),lubridate::ymd("2020-01-01"),"5 years"))
-  axis(2,at = c(-2,-1,log10(c(0.1,0.3,1,3,10,30,100) + 0.1)), labels = c("",0,0.1,0.3,1,3,10,30,100), las = 1)
+               at = seq.Date(lubridate::ymd("1995-01-01"),lubridate::ymd("2020-01-01"),
+                             "5 years"), ...)
+  }else{
+    axis.Date(1, pipeiTrend$date,
+              at = seq.Date(lubridate::ymd("1995-01-01"),lubridate::ymd("2020-01-01"),"5 years"),
+              labels = rep("", length(seq.Date(lubridate::ymd("1995-01-01"),lubridate::ymd("2020-01-01"),
+                                               "5 years"))), ...)
+  }
+  if(ylab){
+  axis(2,at = c(-2,log10(c(0.1,0.3,1,3,10,30,100) + 0.1)), 
+       labels = c("",0.1,0.3,1,3,10,30,100), las = 1, ...)
+  }else{
+    axis(2,at = c(-2,log10(c(0.1,0.3,1,3,10,30,100) + 0.1)), 
+         labels = rep("", length(c("",0.1,0.3,1,3,10,30,100))), las = 1, ...)
+  }
   if(legend){
     legend(lty = c(2,1,1,1,1,3),lwd = c(2,1,1,1,1,1),
-           col = c("black","black","orange","red","green","blue"),
-           legend = c("EI","EB","FV","RO","VR","S"), ...)
+           col = c("black",RColorBrewer::brewer.pal(7,"Set1")[c(1:5,7)]),
+           legend = c(expression(EI[S1]),expression(EI[S]),
+                      expression(EI[SF]),expression(EI[SR]),
+                      expression(EI[SV]),expression(EI[SW]),expression(EI[S0])), ...)
   }
 }
 
