@@ -139,6 +139,10 @@ prepare_runoff_data <- function(hourly_data,
   list(hourly = hourly, daily = daily)
 }
 
+#Prepare Croydon object for use in subsequent functions
+Croydon <- prepare_runoff_data(get(load(paste(here::here("data"), 
+          "/Croydon_1966_hourly_rain_runoff_et.rda", sep = ""))))  
+
 # allupstream() ---------------------------------  
 #' Find all subcatchments upstream of a site in a dendritic hierarchy  
 #' 
@@ -1545,6 +1549,8 @@ EB_subc_on_datex <- function(pipeID, datex,
 #' @param scmID a scmID of and SCM in table SCMs
 #' @param fin_date last date of time series as string "YYYY-MM-DD" (start date 
 #'    is assumed to be the installation date of the scm)
+#' @param runoffData rainfall and runoff time series used for EB calculation. 
+#'     Default is Croydon loaded above.
 #' @return A data.frame with fields scmID, date, and all of the output statistics
 #'    from EB_scm_on_datex. Each row records the EB statistics for the day after
 #'    a recorded change in the dataset
@@ -1559,7 +1565,7 @@ EB_subc_on_datex <- function(pipeID, datex,
 #' # EB_scm_time_series("R2T229", "2019-12-01") #~ 1 s
 #' # # A non-terminal tank
 
-EB_scm_time_series <- function(scmID, start_date, fin_date){
+EB_scm_time_series <- function(scmID, start_date, fin_date, runoffData = Croydon){
   db <- data_for_scm(scmID, fin_date)
   start_date <- lubridate::ymd(start_date)
   fin_date <- lubridate::ymd(fin_date)
@@ -1600,9 +1606,9 @@ EB_scm_time_series <- function(scmID, start_date, fin_date){
        db$ia <- db$ia[db$ia$parcelID %in% db$parcels$parcelID,]
      }
      if(i == 1)
-     EBs <- t(unlist(EB_scm_on_datex(scmID, db = db)))
+     EBs <- t(unlist(EB_scm_on_datex(scmID, db = db, runoffData = runoffData)))
      if(i > 1)
-       EBs <- rbind(EBs, t(unlist(EB_scm_on_datex(scmID, db = db))))
+       EBs <- rbind(EBs, t(unlist(EB_scm_on_datex(scmID, db = db, runoffData = runoffData))))
    }
      EBs <- data.frame(scmID = scmID, 
                        date = change_dates,
@@ -1617,12 +1623,19 @@ EB_scm_time_series <- function(scmID, start_date, fin_date){
 #'    is assumed to be the installation date of the scm)
 #' @param fin_date last date of time series as string "YYYY-MM-DD" (start date 
 #'    is assumed to be the installation date of the scm)
-#' @return a list of three data.frames: 
+#' @param runoffData rainfall and runoff time series used for EB calculation. 
+#'     Default is Croydon loaded above.
+#' @return a list of four data.frames: 
 #'    EBs, EB stats (output of EB_scm_time_series) of all terminal 
 #'    SCMs in the pipeID subcatchment, on the date of each change
 #'    resulting in a change in EB;
 #'    ia_ts, a daily time series of all variants of EI for the subc over the 
 #'    specified time period.
+#'    budget_ts, a daily time series of V_u, runoff from all effective 
+#'    impervious surfaces; V_m, V_u minus the runoff retained by SCMs; F_m, 
+#'    The volume filtered through SCMs. Their values in each row are the sums of
+#'    flows for the entire period of runoffData given the arrangement of SCMs on
+#'    the specified date. (i.e they do not indicate flow volumes on that date)
 #'    non_term_dates: scmIDs that were terminal SCMs for part but not all of the
 #'    time series, with the date at which they stopped being terminal in the field
 #'    date.
@@ -1636,7 +1649,8 @@ EB_scm_time_series <- function(scmID, start_date, fin_date){
 
 EI_subc_time_series <- function(pipeID, 
                                 start_date = as.Date("2001-01-01"), 
-                                fin_date = as.Date("2019-12-31")){
+                                fin_date = as.Date("2019-12-31"),
+                                runoffData = Croydon){
     if(start_date < "2001-01-01")
     stop("Earliest start date is '2001-01-01'", call. = FALSE)
   allusi <- allupstream(subcs, pipeID, "pipeID")
@@ -1695,16 +1709,18 @@ if(length(non_term_dates$date[j]) != sum(scmsDecommissioned$scmID == non_term_da
   }
   # db <- data_on_datex(pipeID, fin_date)
   # carea <- db$subcs$carea[db$subcs$pipeID == pipeID]
-  iats <- budget_ts <- ia_ts(pipeID, start_date = start_date, fin_date = fin_date)
+  iats <- ia_ts(pipeID, start_date = start_date, fin_date = fin_date)
+  budget_ts <- ia_ts[,1]
   iats$s <- iats$ro <- iats$vr <- iats$fv <- iats$wq  <- iats$eb <- iats$eia
-  budget_ts$V_u <- budget_ts$V_m <- budget_ts$F_u <- 0
+  budget_ts$V_u <- iats$eia * sum(runoffData$daily$runoff_mm)
+  budget_ts$F_m <- budget_ts$V_m <- 0
   for(i in 1:length(terminal_scms)){
     if(terminal_scms[i] %in% non_term_dates$scmID) {
       end <- non_term_dates$date[non_term_dates$scmID == terminal_scms[i]]
     }else{
       end <- fin_date
     }
-   EBi <- data.table::data.table(EB_scm_time_series(terminal_scms[i], start_date, end))
+   EBi <- data.table::data.table(EB_scm_time_series(terminal_scms[i], start_date, end, runoffData = runoffData))
    EBi_dates <- unique(c(EBi$date, end))
     for(j in 1:(length(EBi_dates)-1)){
       iats[iats$date > EBi_dates[j] & iats$date <= EBi_dates[j + 1],
@@ -1714,7 +1730,14 @@ if(length(non_term_dates$date[j]) != sum(scmsDecommissioned$scmID == non_term_da
         EBi[rep(j,sum(iats$date > EBi_dates[j] & iats$date <= EBi_dates[j + 1])),
             c("EB_max","RO","VR","FV","WQ","EB")] * 100
       # * 100 because the original EB score was scaled to 100 m2, this converts EB unit to m
+      budget_ts$V_m[budget_ts$date > EBi_dates[j] & budget_ts$date <= EBi_dates[j + 1]] <-
+        iats$s[iats$date > EBi_dates[j] & iats$date <= EBi_dates[j + 1]] * sum(runoffData$daily$runoff_mm) + 
+        EBi$V_m[rep(j,sum(iats$date > EBi_dates[j] & iats$date <= EBi_dates[j + 1]))]
+      budget_ts$F_m[budget_ts$date > EBi_dates[j] & budget_ts$date <= EBi_dates[j + 1]] <-
+        budget_ts$F_m[budget_ts$date > EBi_dates[j] & budget_ts$date <= EBi_dates[j + 1]] +
+        EBi$F_m[rep(j,sum(iats$date > EBi_dates[j] & iats$date <= EBi_dates[j + 1]))]
     }
+   budget_ts[1,c("V_m","F_m")] <- budget_ts[2,c("V_m","F_m")]
     if(i == 1)
       EBs <- EBi
     if(i > 1)
@@ -1724,7 +1747,7 @@ if(length(non_term_dates$date[j]) != sum(scmsDecommissioned$scmID == non_term_da
   cols <- c("tia","eia","eb","wq","fv","vr","ro","s")
   iats[, (cols) := lapply(.SD, function(x) x/carea), .SDcols = cols]
   names(iats)[3:4] <- c("ti","ei")
-  list(EBs = EBs, iats = iats, non_term_dates = non_term_dates)
+  list(EBs = EBs, iats = iats, budget_ts = budget_ts, non_term_dates = non_term_dates)
 }
 
 # budget_scm_time_series() ---------------------------------
