@@ -5,11 +5,11 @@ author: 'Christopher J. Walsh, Matthew J. Burns, Tim D. Fletcher, Darren G. Bos,
 date: 'School of Ecosystem and Forest Sciences, The University of Melbourne, 500 Yarra Boulevard, Burnley Victoria 3121, Australia '
 output:
   word_document:
-    reference_docx: myStyle_double.docx
+    reference_docx: officedown_template.docx
 csl: water-resources-research.csl
 bibliography: references.bib
 ---
-### Equations and Figures
+### Table and Figures
 =======
 
 ### Figure captions  
@@ -18,31 +18,44 @@ Fig. 1.  Examples of stream ecosystem response variables as a function of effect
 
 Fig. 2.  The 11 streamflow-gauging sites considered in this paper and their catchments, coloured by their status as control, experimental or reference. The 7 primary catchments of the original experiment are italicized. Impervious areas in each catchment are shaded by their connection to the stormwater drainage system. (Impervious areas outside catchments are not shown.)  Inset maps show the location of the main map (grey rectangle) in Victoria, Australia.  
 
-Fig. 3. Time series of effective impervious (EI) variants achieved in each of the experimental catchments.  Subscripts denote variants. S1: all effective impervious areas upstream of stormwater control measures (SCMs) unweighted (assuming SCMs have no effect, S = 1). S0: all effective impervious areas upstream of SCMs set to 0 (assuming all SCMs retain stormwater perfectly). For other subscripts, 
+Fig. 3.  Stormwater control spread and effectiveness in each of the 6 experimental sub-catchments. A. Number of SCM projects per ha of effective impervious area (EIA).  B. Percentage of EIA that drains to at least one SCM. C.Percentage of impervious runoff filtered through SCMs or to soil.  D. Percentage of impervious runoff harvested or lost to evapo-transpiration in SCMs. In C and D, the pink polygons indicate the target percentages proposed by Walsh et al. (2012).  D8 and L4 bars are shaded to indicate that these sub-catchments contain other sub-catchments. D4 is part of D8, and L1, Ln and Ls are part of L4: see Fig. 1.  
+
+Fig. 4. Time series of effective impervious (EI) variants achieved in each of the experimental catchments.  Subscripts denote variants. S1: all effective impervious areas upstream of stormwater control measures (SCMs) unweighted (assuming SCMs have no effect, S = 1). S0: all effective impervious areas upstream of SCMs set to 0 (assuming all SCMs retain stormwater perfectly). For other subscripts, 
 all effective impervious surfaces upstream of SCMs are weighted by the stormwater stream impact metric (S), or one of its sub-indices, of the most downstream SCM in any train of SCMs. SF: the filtered-flow sub-metric. SR: the runoff frequency sub-metric. SV: the volume reduction sub-metric. SW: the water quality sub-metric.
 
-Fig. 4. Values of each *EI* variant at each site at the start of the study and the range of its increase as a result of urban growth on the y-axis, and its reduction as a result of SCM implementation in experimental sites on the x-axis.  
+Fig. 5. Values of each *EI* variant at each site at the start of the study and the range of its increase as a result of urban growth on the y-axis, and its reduction as a result of SCM implementation in experimental sites on the x-axis.  
 
+
+```{r loadData, include = FALSE, warning=FALSE, message=FALSE}
+requiredPackages <- c("RPostgreSQL","sf","lubridate","mcr","RColorBrewer",
+                      "httr","rjson","scales","dplyr","here","RPostgreSQL",
+                      "data.table","RMySQL")
+lapply(requiredPackages, require, character.only = TRUE)
+source(here("code","download.OSF.file.R"))
+source(here("code","BACRIfunctions.R"))  
+knitr::opts_chunk$set(echo = FALSE, dev = "pdf")
+#Check all gpkg files have been downloaded to the data file, and download any that are missing.
+source(here("load_ld_scms_tables.R"))
+```
 ##### page break
-Table 1. 
+Table 1. Summary statistics for stormwater control in the 6 experimental sub-catchments.  Stormwater control measure (SCM) projects were commissioned as single projects and consisted of one or more SCMs. Note that the counts for D8 include those listed for its sub-catchment D4, and those for L4 include those for its sub-catchments L1, Ls and Ln. Treated EIA is the effective impervious area draining to one or more SCMs.  The estimates of runoff volume harvested or lost, and volume filtered, are modelled volumes given the arrangement of SCMs in each catchment at the end of the study period assuming rainfall pattern of the average year that was used to calculate S (1965-1966).  
 ```{r echo = FALSE}
 load(here::here("data","ei_ts.rda"))
 ei_fin <- rbind(tail(ei_101$iats,1),tail(ei_103$iats,1),tail(ei_53$iats,1),
                 tail(ei_36$iats,1),tail(ei_74$iats,1),tail(ei_71$iats,1))
-budget_fin <- rbind(tail(ei_101$budget_ts,1),tail(ei_103$budget_ts,1),tail(ei_53$budget_ts,1),
-                tail(ei_36$budget_ts,1),tail(ei_74$budget_ts,1),tail(ei_71$budget_ts,1))
+load("data/final_stats.rda")
 cat_stats <- data.frame(pipeID = c(101,103,53,36,74,71),
-                        site = c("DBS0004","DBS0008","LSN0001","LSS0001","LIS0001","LIS0004"),
+                        site = final_stats$site,
                         cat = c("D4","D8","Ln","Ls","L1","L4"),
                         n_scms = NA,
                         n_scm_projects = NA,
-                        ei_s1 = round(100 * ei_fin$ei, 1),
-                        ia_treated_ha = round(1e-4 * ei_fin$carea * (ei_fin$ei - ei_fin$s) / ei_fin$ei),
+                        eia_s1_ha = round(1e-4 * ei_fin$ei * ei_fin$carea,1),
+                        ia_treated_ha = round(1e-4 * ei_fin$carea * (final_stats$EI - final_stats$EI_s),1),
                         ia_treated_perc = round(100 * (ei_fin$ei - ei_fin$s) / ei_fin$ei,1),
-                        vol_reduced_ML = round((budget_fin$V_u - budget_fin$V_m) * 1e-6),
-                        vol_reduced_perc = round(100* (budget_fin$V_u - budget_fin$V_m) / budget_fin$V_u,1),
-                        vol_filtered_L = round(budget_fin$F_m * 1e-6),
-                        vol_filtered_perc = round(100* (budget_fin$F_m) / budget_fin$V_u,1),
+                        vol_reduced_ML = round((final_stats$V_u - final_stats$V_m) * 1e-6),
+                        vol_reduced_perc = round(100* (final_stats$V_u - final_stats$V_m) / final_stats$V_u,1),
+                        vol_filtered_L = round(final_stats$F_m * 1e-6),
+                        vol_filtered_perc = round(100* (final_stats$F_m) / final_stats$V_u,1),
                         stringsAsFactors = FALSE)
 SCMs$subc <- subcs$trib[match(SCMs$pipeID,subcs$pipeID)]
 scmProjects$subc <- subcs$trib[match(scmProjects$pipeID,subcs$pipeID)]
@@ -57,22 +70,22 @@ cat_stats$n_scm_projects[cat_stats$cat == "D8"] <- sum(cat_stats$n_scm_projects[
 cat_stats$n_scms[cat_stats$cat == "L4"] <- sum(cat_stats$n_scms[cat_stats$cat %in% c("L4","L1","Ln","Ls")])
 cat_stats$n_scm_projects[cat_stats$cat == "L4"] <- sum(cat_stats$n_scm_projects[cat_stats$cat %in% c("L4","L1","Ln","Ls")])
 
-table_for_word(cat_stats, pgwidth = 6.69)
+cat_stats_t <- data.frame(t(cat_stats[,4:12]))
+names(cat_stats_t) <- cat_stats[,3]
+statistic_col <- c("Number of SCMs", "Number of SCM projects","EIA (ha)",
+                   "Treated EIA (ha)", "% EIA treated", "Runoff volume harvested/lost (ML/y)",
+                   "% Runoff volume harvested/lost", "Runoff volume filtered (ML/y)",
+                   "% Runoff volume filtered")
+cat_stats_t <- data.frame(`Stormwater control` = statistic_col,
+                        cat_stats_t, stringsAsFactors = FALSE)
+#remove % stats, which are presented in Fig. 3
+cat_stats_t <- cat_stats_t[!grepl("%", statistic_col),] 
+ft <- table_for_word(cat_stats_t, font = "Times New Roman", pgwidth = 6.69)
+ft <- flextable::colformat_num(ft, i = 1:2, digits = 0)
+ft <- flextable::align_nottext_col(ft)
+ft
 ```
 ##### page break
-
-
-```{r loadData, include = FALSE, warning=FALSE, message=FALSE}
-requiredPackages <- c("RPostgreSQL","sf","lubridate","mcr","RColorBrewer",
-                      "httr","rjson","scales","dplyr","here","RPostgreSQL",
-                      "data.table","RMySQL")
-lapply(requiredPackages, require, character.only = TRUE)
-source(here("code","download.OSF.file.R"))
-source(here("code","BACRIfunctions.R"))  
-knitr::opts_chunk$set(echo = FALSE, dev = "pdf")
-#Check all gpkg files have been downloaded to the data file, and download any that are missing.
-source(here("load_ld_scms_tables.R"))
-```
 
 ```{r frp_v_ei, warning=FALSE, message=FALSE, fig.width = 7.48, fig.height = 3.5}
 #pdf("Fig1_frp_signal.pdf", width = 7.48, height = 3.5)
@@ -226,6 +239,51 @@ box()
   
 Fig. 2.  
 
+
+```{r scm_stats, fig.width = 6, fig.height = 5, echo = FALSE}
+# Assumed mean annual rainfall for EB calculations = 956.41  - i.e. sum(Croydon$daily$rain_mm)
+# Actual mean annual rainfall over 20 year study period was 929 (including the milennium drought)
+# For purposes of this exercise, let's use the EB calculator's assumption
+# These are the proportion of rainfall values from Zhang (2001)/Walsh et al 2012
+# Note that only 79.1% of rainfall becomes impervious runoff - 
+#   sum(Croydon$daily$runoff_mm)/sum(Croydon$daily$rain_mm)
+Zhang.forest.ro <- 1 - (1 + 2820/956.41)/(1 + 2820/956.41 + 956.41/1410)
+Zhang.pasture.ro <- 1 - (1 + 550/956.41)/(1 + 550/956.41 + 956.41/1100)
+# As a proportion of impervious runoff, they are:
+Zhang.forest.filt.prop <- Zhang.forest.ro / 0.791
+Zhang.pasture.filt.prop <- Zhang.pasture.ro / 0.791
+scm_per_eia <- cat_stats$n_scm_projects/cat_stats$eia_s1_ha
+
+layout(matrix(c(1:5,5), 3,2, byrow = TRUE), heights = c(10,12,1), widths = c(12,12))
+par(mar = c(1,4,1,1))
+barplot(scm_per_eia , ylim = c(0,20), las = 1, 
+        col = c("white",gray(0.75),rep("white",3),gray(0.75)), 
+        ylab = "No. SCM projects/ ha of EIA", cex.lab = 1.25, cex.axis = 1.25, cex.names=1.25)
+title(main = "A.", adj = 0)
+barplot(cat_stats$ia_treated_perc, ylim = c(0,100), las = 1, 
+        col = c("white",gray(0.75),rep("white",3),gray(0.75)), 
+        ylab = "% EIA treated by an SCM", cex.lab = 1.25, cex.axis = 1.25, cex.names=1.25)
+title(main = "B.", adj = 0)
+par(mar = c(2,4,1,1))
+barplot(cat_stats$vol_filtered_perc, ylim = c(0,100), las = 1, names.arg = cat_stats$cat, 
+        col = c("white",gray(0.75),rep("white",3),gray(0.75)), 
+        ylab = "% Runoff volume filtered", cex.lab = 1.25, cex.axis = 1.25, cex.names=1.25)
+polygon(c(-1,8,8,-1), 100*c(rep(Zhang.forest.filt.prop,2),rep(Zhang.pasture.filt.prop,2)), 
+        col = scales::alpha("red",0.25), border = scales::alpha("red",0.25))
+title(main = "C.", adj = 0)
+barplot(cat_stats$vol_reduced_perc , ylim = c(0,100), las = 1, names.arg = cat_stats$cat, 
+        col = c("white",gray(0.75),rep("white",3),gray(0.75)), 
+        ylab = "% Runoff volume harvested/lost", cex.lab = 1.25, cex.axis = 1.25, cex.names=1.25)
+polygon(c(-1,8,8,-1), 100*c(1- rep(Zhang.forest.filt.prop,2),1- rep(Zhang.pasture.filt.prop,2)), 
+        col = scales::alpha("red",0.25), border = scales::alpha("red",0.25))
+title(main = "D.", adj = 0)
+par(mar = c(0,0,0,0))
+plot.new()
+title(xlab = "        Sub-catchment", line = -1.25, cex.lab = 1.25)
+```
+Fig. 3.  
+
+
 ```{r MonitoringSiteTrendsA, results="hide", warning = FALSE, echo = FALSE, fig.width = 7, fig.height = 4, fig.cap = "Time series of effective impervious variants achieved in each of the four LSC catchments."}
 layout(matrix(c(1,2,3,4,1,5,6,7,0,8,8,8),3,4,byrow = TRUE),heights= c(10,10,1),widths = c(1,10,10,10))
 par(mar = c(0,0,0,0))
@@ -253,5 +311,5 @@ plot.new()
 title(xlab = "Date", line = -0.85, cex.lab = 1.5)
 ```
   
-Fig. 3.  
+Fig. 4.  
 
