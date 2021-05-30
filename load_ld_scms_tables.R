@@ -54,6 +54,7 @@ for (i in 1:length(rda_files)) {
     load(here::here("data",rda_files[i]))
   }
 }
+
 # The following files (loaded above) are derived from the database tables using code in the Rmd files
 # ei_ts.rda - see derivation in ei_ts chunk of WalshEtAl_wrr2021_S1-2.Rmd
 
@@ -68,7 +69,14 @@ ia$subc[ia$subc == "LIS0004H"] <- "LIS0004"
 # on of our SCMs. This is accounted for in EI variant calculations. For 
 # representation of impervious coverage, leave it in its original state.
 ia$subc[ia$subc == "BaileyRd"] <- "LIS0004"  
-# 
+# The manually drawn subc boundaries for DBS are not an exact match to the 
+# cat polygons derived from the DEM.  As a result, slight differences in 
+# catchment area estimates. Make consistent for EI calculations.
+subcs$scarea[subcs$pipeName == "DBS0004"] <- cats$carea_m2[cats$sitecode == "DBS0004"] - 
+  sum(subcs$scarea[subcs$pipeID %in% c(102,106,107)])
+subcs$scarea[subcs$pipeName == "DBS0008"] <- cats$carea_m2[cats$sitecode == "DBS0008"] - 
+  sum(subcs$scarea[subcs$pipeID %in% c(101,102,104:108)])
+
 catIA <- rbind(ia, catIA[names(catIA) != "address"])
 #minor differences in sampling reaches over time and for different purposes, 
 #and minor changes in catchment boundaries with some SCMs.  Select original hydrology sites for map
@@ -81,18 +89,35 @@ siteMap11 <- sites[sites$hydrology == 1,]
 siteMap11$sitecode <- substr(siteMap11$sitecode,1,7)
 siteMap11$col <- catMap11$col[match(siteMap11$sitecode, catMap11$sitecode)]
 
+#Compile summary stats for each site on final date
+# system.time({
+#   final_stats <- rbind(data.frame(site = "DBS0004",
+#                             EB_subc_on_datex(101, as.Date("2019-12-31"))[-1]),
+#                        data.frame(site = "DBS0008",
+#                                   EB_subc_on_datex(103, as.Date("2019-12-31"))[-1]),
+#                        data.frame(site = "LSN0001",
+#                                   EB_subc_on_datex(53, as.Date("2019-12-31"))[-1]),
+#                        data.frame(site = "LSS0001",
+#                                   EB_subc_on_datex(36, as.Date("2019-12-31"))[-1]),
+#                        data.frame(site = "LIS0001",
+#                                   EB_subc_on_datex(74, as.Date("2019-12-31"))[-1]),
+#                        data.frame(site = "LIS0004",
+#                                   EB_subc_on_datex(71, as.Date("2019-12-31"))[-1]))
+# })  #~21 minutes
+save(final_stats, file = "data/final_stats.rda", compress = "xz")
+
 ##### Compile a data frame of TI and EI series for all 11 catchments ####
 
 # #' Calculate time series of EI variants for the 6 experimental catchments
 # #' Indicative calculation times (total for all 6 catchments ~ ~2 h) based 
 # #' on running on a computer with a 3.3 GHz processor, using Linux OS (Ubuntu 18.4)
-# system.time(ei_53 <- EI_subc_time_series(53))   #~14 min (pipeID 53 = Ln)
-# system.time(ei_36 <- EI_subc_time_series(36))   #~28 min (pipeID 36 = Ls)
 # system.time(ei_74 <- EI_subc_time_series(74))   #~2 min (pipeID 74 = L1)
-# system.time(ei_101 <- EI_subc_time_series(101)) #~9 min (pipeID 101 = D4)
-# system.time(ei_71 <- EI_subc_time_series(71))   #48 min (pipeID 71 = L4)
-# system.time(ei_103 <- EI_subc_time_series(103)) #22 min (pipeID 103 = D8)
-# save(ei_53,ei_36,ei_74,ei_101,ei_71,ei_103, file = "data/ei_ts.rda", compress = "xz")
+# system.time(ei_53 <- EI_subc_time_series(53))   #~11 min (pipeID 53 = Ln)
+# system.time(ei_36 <- EI_subc_time_series(36))   #~22 min (pipeID 36 = Ls)
+# system.time(ei_101 <- EI_subc_time_series(101)) #~12 min (pipeID 101 = D4)
+# system.time(ei_71 <- EI_subc_time_series(71))   #~38 min (pipeID 71 = L4)
+# system.time(ei_103 <- EI_subc_time_series(103)) #21 min (pipeID 103 = D8)
+# # save(ei_53,ei_36,ei_74,ei_101,ei_71,ei_103, file = "data/ei_ts.rda", compress = "xz")
 load(here::here("data","/ei_ts.rda"))
 
 ei_ts <- rbind(
