@@ -13,11 +13,11 @@ modfunctions <- ifelse(grepl("lsc_dbs_scms", getwd()),
 source(modfunctions)
 
 
-table_for_word <- function(input_table, pgwidth = 6.69){  
+table_for_word <- function(input_table, font = "Helvetica", pgwidth = 6.69){  
 ft <- flextable::regulartable(input_table)
 ft <- flextable::align(ft, align = "left", part = "all")
 ft <- flextable::valign(ft, valign = "top", part = "all")
-ft <- flextable::font(ft,fontname = "Helvetica", part = "all")
+ft <- flextable::font(ft,fontname = font, part = "all")
 ft <- flextable::fontsize(ft, size = 10, part = "all")
 ft <- flextable::padding(ft, padding.top = 2,  padding.bottom = 2, part = "all")
 ft <- flextable::autofit(ft)
@@ -395,10 +395,28 @@ data_on_datex <- function(pipeID, datex){
   #4. restrict scmProjects to those subcs and correct for parcelChanges before datex
   scmProjectsx <- scmProjects[scmProjects$pipeID %in% subcsx$pipeID &
                                 scmProjects$installDate < datex,]
-  #5. restrict SCMs to relevant scmProjects and update specs according to scmChanges
+  #5. restrict SCMs to relevant scmProjects and update specs according to scmChanges and scmsDecommissioned
   if(dim(scmProjectsx)[1] > 0){
+    projects_to_check <- vector()
     SCMsx <- SCMs[SCMs$projectID %in% scmProjectsx$projectID,]
-    scx <- scmChanges[scmChanges$scmID %in% SCMsx$scmID & 
+    if(sum(SCMsx$scmID %in% scmsDecommissioned$scmID[scmsDecommissioned$decommDate <= datex]) > 0) {
+      scms_decx <- scmsDecommissioned$scmID[scmsDecommissioned$decommDate <= datex]
+      for(i in 1:length(scms_decx)){
+        if(sum(!is.na(SCMsx$nextds) & SCMsx$nextds == scms_decx[i]) > 0){
+        SCMsx$nextds[SCMsx$nextds == scms_decx[i]] <- SCMsx$nextds[SCMsx$scmID == scms_decx[i]]
+        }
+        projects_to_check <- unique(c(projects_to_check, SCMs$projectID[SCMs$scmID == scms_decx[i]]))
+        SCMsx <- SCMsx[SCMsx$scmID != scms_decx[i],]
+      }
+      #check if it was a whole project that was decommissioned
+      if(length(projects_to_check) > 0){
+        for(i in 1:length(projects_to_check)){
+          if(sum(SCMs$projectID == projects_to_check[i] & !SCMs$scmID %in% scms_decx) == 0)
+          scmProjectsx <- scmProjectsx[scmProjectsx$projectID != projects_to_check[i],]
+        }
+      }
+    }
+      scx <- scmChanges[scmChanges$scmID %in% SCMsx$scmID & 
                         scmChanges$changeDate < datex & 
                         scmChanges$param != "INFO",]
     scx <- scx[order(scx$changeDate),]
@@ -552,7 +570,7 @@ data_for_scm <- function(scmID, fin_date = "2019-12-31"){
       scmProjectsx <- scmProjects[scmProjects$projectID %in% SCMsx$projectID,]
       parcelsx <- parcels[parcels$parcelID %in% SCMsx$parcelID,]
       iax <- ia[ia$parcelID %in% parcelsx$parcelID,]
-      pcx <- parcels[0,] #for non-PLs, parcel changes irrelevant...
+      pcx <- parcelChanges[0,] #for non-PLs, parcel changes irrelevant...
       scx <- scmChanges[scmChanges$scmID %in% SCMsx$scmID & scmChanges$changeDate < fin_date,]
       sdx <- scmsDecommissioned[scmsDecommissioned$scmID %in% SCMsx$scmID & scmsDecommissioned$decommDate < fin_date,]
     }
@@ -1334,7 +1352,7 @@ EB_scm_on_datex <- function(scmID,
 
 ### 2. Volume reduction index, VR
     # Theoretical streamflow coefficients for forested and pasture catchments
-    mean.annrain.mm <- sum(runoffData$daily$runoff_mm)
+    mean.annrain.mm <- sum(runoffData$daily$rain_mm)
     Zhang.forest.ro <- 1 - (1 + 2820/mean.annrain.mm)/(1 + 2820/mean.annrain.mm + mean.annrain.mm/1410)
     Zhang.pasture.ro <- 1 - (1 + 550/mean.annrain.mm)/(1 + 550/mean.annrain.mm + mean.annrain.mm/1100)
     # if there is more in the SCMs at the end than in the 
@@ -1349,7 +1367,7 @@ EB_scm_on_datex <- function(scmID,
     V_n <- x$imp_carea * Zhang.forest.ro * mean.annrain.mm
     VR <- (1 - max((V_m - V_n)/(V_u - V_n), 0)) * x$imp_carea/100
     if(reward.overextraction) {
-    # thus possible for a specific SCM to score VR > 1: useful if using the  
+    # thus possible for a specific SCM to score VR > max EB: useful if using the  
     # EB index to value projects and aiming for catchment-wide volume reduction, 
     # but not able to achieve it in all SCMs.
       VR <- (1 - (V_m - V_n)/(V_u - V_n)) * x$imp_carea/100
@@ -1483,7 +1501,9 @@ EB_scm_on_datex <- function(scmID,
 #'     upstream of each SCM are weighted by its volume reduction EB sub-index), 
 #'     EI_sFV effective (where surfaces upstream of each SCM are weighted by its 
 #'     Filtered volume EB sub-index), EI_sEB effective (where surfaces upstream 
-#'     of each SCM are weighted by its Runoff frequency EB index).
+#'     of each SCM are weighted by its Runoff frequency EB index), V_u, runoff
+#'     from all IA in the subc, V_m, runoff from all IA in the subc accounting 
+#'     for SCM retention, F_m, runoff filtered by SCMs in the subc.
 #' @details See WalshEtAl_LSCfoundation_figsTabs.Rmd for details on EB variables
 #'     and https://urbanstreams.net/lsc/EBcalctech.html for information on water
 #'     quality parameters not considered in the foundation paper
@@ -1513,19 +1533,31 @@ EB_subc_on_datex <- function(pipeID, datex,
   tia <- sum(db$ia$area_m2)
   eia <- sum(db$ia$area_m2*db$ia$conn)  # connected IA ignoring SCMs
   if(dim(terminal_scms)[1] > 0){
+    if(terminal_scms$pipeID[1] == pipeID){
+      dbi <- db
+    }else{
+      dbi <- data_on_datex(terminal_scms$pipeID[1], datex)
+    }
   x <- data.frame(scmID = terminal_scms$scmID[1], 
              t(unlist(EB_scm_on_datex(terminal_scms$scmID[1], db, runoffData))))  #, ...
   }
   if(dim(terminal_scms)[1] > 1){
     for(i in 2:dim(terminal_scms)[1]){
-        x <- rbind(x,
+      if(terminal_scms$pipeID[i] == pipeID){
+        dbi <- db
+      }else{
+        dbi <- data_on_datex(terminal_scms$pipeID[i], datex)
+      }
+      x <- rbind(x,
                    data.frame(scmID = terminal_scms$scmID[i], 
-                      t(unlist(EB_scm_on_datex(terminal_scms$scmID[i], db, runoffData)))))  #, ...
+                      t(unlist(EB_scm_on_datex(terminal_scms$scmID[i], dbi, runoffData)))))  #, ...
   }
   eia_scms <- sum(x$EB_max)*100         #IA draining to an SCM
-  eia_s <- eia - eia_scms               #all ia draining to an SCM, W = 0
+  eia_s <- eia - eia_scms               #all ia NOT draining to an SCM, W = 1
   eia_sRO <- eia_s + sum(x$EB_max*(1- x$RO/x$EB_max))*100 # ia draining to an SCM, W = RO
   eia_sVR <- eia_s + sum(x$EB_max*(1- x$VR/x$EB_max))*100 # ia draining to an SCM, W = VR
+   # note that negative values are possible for 1- x$VR/x$EB_max because over-extraction is rewarded, 
+   # given the broader challenge in finding enough demand
   eia_sFV <- eia_s + sum(x$EB_max*(1- x$FV/x$EB_max))*100 # ia draining to an SCM, W = FV
   eia_sEB <- eia_s + sum(x$EB_max*(1- x$EB/x$EB_max))*100 # ia draining to an SCM, W = EB
   }else{
@@ -1540,7 +1572,12 @@ EB_subc_on_datex <- function(pipeID, datex,
   EI_sEB <- eia_sEB/carea
   if(dim(terminal_scms)[1] == 0) x <- NA
   list(scm_stats = x, TI = TI, EI = EI, EI_s = EI_s, EI_sRO = EI_sRO,
-       EI_sVR = EI_sVR, EI_sFV = EI_sFV, EI_sEB = EI_sEB)
+       EI_sVR = EI_sVR, EI_sFV = EI_sFV, EI_sEB = EI_sEB,
+       V_u = eia * sum(runoffData$daily$runoff_mm), #runoff from all IA in catchment
+       #Note this differs from V_u in x because x only includes IA draining to SCMs
+       V_m = eia_s * sum(runoffData$daily$runoff_mm) + sum(x$V_m), #runoff from 
+       #all IA in catchment, accounting for SCM retention
+       F_m = sum(x$F_m))
 }
   
 # EB_scm_time_series() ---------------------------------
@@ -1587,11 +1624,12 @@ EB_scm_time_series <- function(scmID, start_date, fin_date, runoffData = Croydon
      change_dates <- unique(c(start_date, change_dates))
      change_dates <- change_dates[change_dates >= start_date & change_dates < fin_date]
      if(scmProjects$installDate[scmProjects$projectID == 
-                                SCMs$projectID[SCMs$scmID == scmID]] > start_date)
+                                SCMs$projectID[SCMs$scmID == scmID]] > start_date){
      change_dates <- change_dates[change_dates >= scmProjects$installDate[scmProjects$projectID == 
                                                                               SCMs$projectID[SCMs$scmID == scmID]]]
      change_dates <- unique(c(change_dates, scmProjects$installDate[scmProjects$projectID == 
                                              SCMs$projectID[SCMs$scmID == scmID]]))
+                       }
      change_dates <- change_dates[order(change_dates, decreasing = FALSE)]
         for(i in 1:length(change_dates)) {
      db <- data_on_datex(pipeID, change_dates[i] + days(1))
@@ -1625,17 +1663,12 @@ EB_scm_time_series <- function(scmID, start_date, fin_date, runoffData = Croydon
 #'    is assumed to be the installation date of the scm)
 #' @param runoffData rainfall and runoff time series used for EB calculation. 
 #'     Default is Croydon loaded above.
-#' @return a list of four data.frames: 
+#' @return a list of three data.frames: 
 #'    EBs, EB stats (output of EB_scm_time_series) of all terminal 
 #'    SCMs in the pipeID subcatchment, on the date of each change
 #'    resulting in a change in EB;
 #'    ia_ts, a daily time series of all variants of EI for the subc over the 
 #'    specified time period.
-#'    budget_ts, a daily time series of V_u, runoff from all effective 
-#'    impervious surfaces; V_m, V_u minus the runoff retained by SCMs; F_m, 
-#'    The volume filtered through SCMs. Their values in each row are the sums of
-#'    flows for the entire period of runoffData given the arrangement of SCMs on
-#'    the specified date. (i.e they do not indicate flow volumes on that date)
 #'    non_term_dates: scmIDs that were terminal SCMs for part but not all of the
 #'    time series, with the date at which they stopped being terminal in the field
 #'    date.
@@ -1710,10 +1743,7 @@ if(length(non_term_dates$date[j]) != sum(scmsDecommissioned$scmID == non_term_da
   # db <- data_on_datex(pipeID, fin_date)
   # carea <- db$subcs$carea[db$subcs$pipeID == pipeID]
   iats <- ia_ts(pipeID, start_date = start_date, fin_date = fin_date)
-  budget_ts <- ia_ts[,1]
   iats$s <- iats$ro <- iats$vr <- iats$fv <- iats$wq  <- iats$eb <- iats$eia
-  budget_ts$V_u <- iats$eia * sum(runoffData$daily$runoff_mm)
-  budget_ts$F_m <- budget_ts$V_m <- 0
   for(i in 1:length(terminal_scms)){
     if(terminal_scms[i] %in% non_term_dates$scmID) {
       end <- non_term_dates$date[non_term_dates$scmID == terminal_scms[i]]
@@ -1730,24 +1760,18 @@ if(length(non_term_dates$date[j]) != sum(scmsDecommissioned$scmID == non_term_da
         EBi[rep(j,sum(iats$date > EBi_dates[j] & iats$date <= EBi_dates[j + 1])),
             c("EB_max","RO","VR","FV","WQ","EB")] * 100
       # * 100 because the original EB score was scaled to 100 m2, this converts EB unit to m
-      budget_ts$V_m[budget_ts$date > EBi_dates[j] & budget_ts$date <= EBi_dates[j + 1]] <-
-        iats$s[iats$date > EBi_dates[j] & iats$date <= EBi_dates[j + 1]] * sum(runoffData$daily$runoff_mm) + 
-        EBi$V_m[rep(j,sum(iats$date > EBi_dates[j] & iats$date <= EBi_dates[j + 1]))]
-      budget_ts$F_m[budget_ts$date > EBi_dates[j] & budget_ts$date <= EBi_dates[j + 1]] <-
-        budget_ts$F_m[budget_ts$date > EBi_dates[j] & budget_ts$date <= EBi_dates[j + 1]] +
-        EBi$F_m[rep(j,sum(iats$date > EBi_dates[j] & iats$date <= EBi_dates[j + 1]))]
     }
-   budget_ts[1,c("V_m","F_m")] <- budget_ts[2,c("V_m","F_m")]
-    if(i == 1)
+    if(i == 1){
       EBs <- EBi
-    if(i > 1)
+    }else{
       EBs <- rbind(EBs, EBi)
+      }
   } 
   carea <- iats$carea
   cols <- c("tia","eia","eb","wq","fv","vr","ro","s")
   iats[, (cols) := lapply(.SD, function(x) x/carea), .SDcols = cols]
   names(iats)[3:4] <- c("ti","ei")
-  list(EBs = EBs, iats = iats, budget_ts = budget_ts, non_term_dates = non_term_dates)
+  list(EBs = EBs, iats = iats, non_term_dates = non_term_dates)
 }
 
 # budget_scm_time_series() ---------------------------------
