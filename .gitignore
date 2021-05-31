@@ -6,3 +6,5 @@ scratch.R
 *.docx
 !officedown_template.docx
 data/*.gpkg
+data/lsc_rain_hourly.rda
+
