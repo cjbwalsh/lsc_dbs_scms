@@ -20,10 +20,9 @@ Fig. 2.  The 11 streamflow-gauging sites considered in this paper and their catc
 
 Fig. 3.  Stormwater control spread and effectiveness in each of the 6 experimental sub-catchments. A. Number of SCM projects per ha of effective impervious area (EIA).  B. Percentage of EIA that drains to at least one SCM. C.Percentage of impervious runoff filtered through SCMs or to soil.  D. Percentage of impervious runoff harvested or lost to evapo-transpiration in SCMs. In C and D, the pink polygons indicate the target percentages proposed by Walsh et al. (2012).  D8 and L4 bars are shaded to indicate that these sub-catchments contain other sub-catchments. D4 is part of D8, and L1, Ln and Ls are part of L4: see Fig. 1.  
 
-Fig. 4. Time series of effective impervious (EI) variants achieved in each of the experimental catchments.  Subscripts denote variants. S1: all effective impervious areas upstream of stormwater control measures (SCMs) unweighted (assuming SCMs have no effect, S = 1). S0: all effective impervious areas upstream of SCMs set to 0 (assuming all SCMs retain stormwater perfectly). For other subscripts, 
-all effective impervious surfaces upstream of SCMs are weighted by the stormwater stream impact metric (S), or one of its sub-indices, of the most downstream SCM in any train of SCMs. SF: the filtered-flow sub-metric. SR: the runoff frequency sub-metric. SV: the volume reduction sub-metric. SW: the water quality sub-metric.
+Fig. 4. Time series of effective imperviousness (EI) variants achieved in each of the experimental catchments.  Subscripts denote variants. S1: all effective impervious areas upstream of stormwater control measures (SCMs) unweighted (assuming SCMs have no effect, S = 1). S0: all effective impervious areas upstream of SCMs set to 0 (assuming all SCMs retain stormwater perfectly). For other subscripts, all effective impervious surfaces upstream of SCMs are weighted by the stormwater stream impact metric (S), or one of its sub-indices, of the most downstream SCM in any train of SCMs. SF: the filtered-flow sub-metric. SR: the runoff frequency sub-metric. SV: the volume reduction sub-metric. SW: the water quality sub-metric.
 
-Fig. 5. Values of each *EI* variant at each site at the start of the study and the range of its increase as a result of urban growth on the y-axis, and its reduction as a result of SCM implementation in experimental sites on the x-axis.  
+Fig. 5. Time series of log-transformed effective imperviousness assuming no stormwater control (A, *EI~S1~*), and $\Delta$*EI~S~* (B, change in log-transformed EI weighted by the stormwater stream impact metric, *S*), and $\Delta$*EI~S0~* (C, change in log-transformed *EI* with all impervious surfaces draining to an SCM weighted zero) for the two control (C) sub-catchments, three reference (R) sub-catchments and the six experimental sub-catchments, indicated by code (see Fig. 2).
 
 
 ```{r loadData, include = FALSE, warning=FALSE, message=FALSE}
@@ -41,9 +40,9 @@ source(here("load_ld_scms_tables.R"))
 Table 1. Summary statistics for stormwater control in the 6 experimental sub-catchments.  Stormwater control measure (SCM) projects were commissioned as single projects and consisted of one or more SCMs. Note that the counts for D8 include those listed for its sub-catchment D4, and those for L4 include those for its sub-catchments L1, Ls and Ln. Treated EIA is the effective impervious area draining to one or more SCMs.  The estimates of runoff volume harvested or lost, and volume filtered, are modelled volumes given the arrangement of SCMs in each catchment at the end of the study period assuming rainfall pattern of the average year that was used to calculate S (1965-1966).  
 ```{r echo = FALSE}
 load(here::here("data","ei_ts.rda"))
+load(here::here("data","final_stats.rda"))
 ei_fin <- rbind(tail(ei_101$iats,1),tail(ei_103$iats,1),tail(ei_53$iats,1),
                 tail(ei_36$iats,1),tail(ei_74$iats,1),tail(ei_71$iats,1))
-load("data/final_stats.rda")
 cat_stats <- data.frame(pipeID = c(101,103,53,36,74,71),
                         site = final_stats$site,
                         cat = c("D4","D8","Ln","Ls","L1","L4"),
@@ -313,3 +312,67 @@ title(xlab = "Date", line = -0.85, cex.lab = 1.5)
   
 Fig. 4.  
 
+```{r echo=FALSE, fig.width = 7, fig.height = 2.5}
+ei_ts$lei <- log10(ei_ts$ei*100 + 0.1)
+ei_ts$lei_s <- ei_ts$lei_s0 <- ei_ts$lei
+exp_cats <- unique(ei_ts_all$sitecode)
+for(i in 1:length(exp_cats)){
+  ei_ts$lei_s[ei_ts$sitecode == exp_cats[i]] <- log10(ei_ts_all$eb[ei_ts_all$sitecode == exp_cats[i]]*100 + 0.1)
+  ei_ts$lei_s0[ei_ts$sitecode == exp_cats[i]] <- log10(ei_ts_all$s[ei_ts_all$sitecode == exp_cats[i]]*100 + 0.1)
+}
+ei_ts$del_ei_s <-  ei_ts$lei_s - ei_ts$lei
+ei_ts$del_ei_s0 <- ei_ts$lei_s0 -ei_ts$lei
+
+line_cols <- siteMap11$col
+line_cols[match(c("LIS0001","DBS0008","DBS0004","LIS0004","LSS0001","LSN0001"), siteMap11$sitecode)] <-  
+  RColorBrewer::brewer.pal(7,"YlOrRd")[2:7]
+ 
+layout(matrix(c(1,2,3,4,4,4), ncol=3, byrow=TRUE), heights = c(10,1), widths = c(10,10,10))
+par(mar=c(2,4,1,1))
+
+ plot(ei_ts$date, ei_ts$lei, type = 'n',
+      axes = FALSE, ylab = "", 
+      ylim = c(-1,1.5))
+ axis(2,at = seq(-2,2,0.5),las = 1)
+ axis(1, at = c(0,1e6))
+ axis.Date(1, ei_ts$date,las = 1)
+ title(ylab = expression(log[10](EI[S1] + 0.1)), line = 2.5)
+ for(j in 1:length(siteMap11$sitecode)){
+ lines(ei_ts$date[ei_ts$sitecode == siteMap11$sitecode[j]], 
+       ei_ts$lei[ei_ts$sitecode == siteMap11$sitecode[j]], type = 'l', col = line_cols[j])
+ }
+ title("A.",adj = 0)
+ 
+ plot(ei_ts$date, ei_ts$del_ei_s, type = 'n', 
+      axes = FALSE, ylab = expression(~Delta~EI[S]), ylim = c(-2,0.5))
+ axis(2,at = seq(-3,2,0.5),las = 1)
+ axis(1, at = c(0,1e6))
+ axis.Date(1, ei_ts$date,las = 1)
+ for(j in 1:length(siteMap11$sitecode)){
+ lines(ei_ts$date[ei_ts$sitecode == siteMap11$sitecode[j]], 
+       ei_ts$del_ei_s[ei_ts$sitecode == siteMap11$sitecode[j]], type = 'l', col = line_cols[j])
+ }
+ title("B.",adj = 0)
+ 
+ plot(ei_ts$date, ei_ts$del_ei_s0, type = 'n', 
+      axes = FALSE, ylab = expression(~Delta~EI[S0]), ylim = c(-2,0.5))
+ axis(2,at = seq(-3,2,0.5),las = 1)
+ axis(1, at = c(0,1e6))
+ axis.Date(1, ei_ts$date,las = 1)
+ for(j in 1:length(siteMap11$sitecode)){
+ lines(ei_ts$date[ei_ts$sitecode == siteMap11$sitecode[j]], 
+       ei_ts$del_ei_s0[ei_ts$sitecode == siteMap11$sitecode[j]], type = 'l', col = line_cols[j])
+ }
+ title("C.",adj = 0)
+ 
+ legend("bottomleft", lty = 1, 
+        col = c(siteMap11$col[siteMap11$sitecode == "BRS0015"], 
+                siteMap11$col[siteMap11$sitecode == "LYR0007"],
+                RColorBrewer::brewer.pal(7,"YlOrRd")[2:7]),
+        legend = c("C","R","L1","D8",
+                   "D4","L4","Ls","Ln"),
+        cex = 0.9)
+
+ par(mar = c(0,0,0,0)); plot.new(); title(xlab = "      Date", line = -1.5)
+```
+Fig. 5

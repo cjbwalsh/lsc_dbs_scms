@@ -616,11 +616,11 @@ Time series of EI variants and of modelled flows over the length of the study ca
 ```{r echo=FALSE}
 fig_no <- fig_no + 1
 ```
-```{r figS3_9, fig.width=6, fig.height=3}
+```{r figS3_9, fig.width=6, fig.height=4}
 Croydon <- prepare_runoff_data(get(load(paste(here::here("data"), 
                         "/Croydon_1966_hourly_rain_runoff_et.rda", sep = ""))))
 ei_29 <- EI_subc_time_series(29)
-plotlEItrends(ei_29$iats, legend = TRUE, "topleft", cex = 0.8)
+plotlEItrends(ei_29$iats, legend = TRUE, ylab = TRUE, xlab = TRUE, cex = 0.8)
 title(ylab = "Effective imperviousness variant (%)", xlab = "Date", cex.lab = 0.75)
 ```
 
@@ -633,8 +633,9 @@ fig_no <- fig_no + 1
 load(here("data","lsc_rain_hourly.rda"))
 lsc_rain_hourly$runoff_mm <- lose.init(lsc_rain_hourly$rain_mm,0.256,2)
 lsc_runoff <- prepare_runoff_data(lsc_rain_hourly) 
-#system.time(
-  budget_29 <- budget_subc_time_series(pipeID = 29, runoffData = lsc_runoff)#) #~ 12 min
+# system.time(
+  budget_29 <- budget_subc_time_series(pipeID = 29, runoffData = lsc_runoff)
+  #) #~ 2 min
 layout(matrix(c(1,2),byrow = TRUE, 2,1), heights = c(11.5,12))
 par(mar = c(2,4,1,1))
 with(budget_29$daily, plot(date, ei_runoff/carea, type = 'l',
@@ -651,7 +652,7 @@ with(budget_29$hourly[date > "2018-01-01"], lines(date, ei_scm_runoff/carea, col
 
 The non-linear trend in EI (Fig. S`r fig_no - 1`) in this small catchment is because, prior to 2006, Wattle Valley Road was unsealed, and the impervious surfaces on properties of the subcatchment drained to the stream informally or along the roadside swale (and thus considered non-effective). In 2006, the road was sealed and curbed, with stormwater drainage connecting the road and houses of the subcatchment to the stream.  SCMs installed in the project progressively reduced that connection, culminating in the construction of a large raingarden at the bottom of the subcatchment in 2012, which captured runoff from all subcatchment impervious surfaces.  
 
-Fig. S`r fig_no`a shows the models assume no impervious runoff from the subcatchment before sealing and piping of Wattle Valley Road in 2006, and a reduction in impervious runoff leaving the catchment following installation of SCMs in the subcatchmnent. Fig. SS`r fig_no`a, shows that the frequency of overflow from the terminal SCM in this subcatchment was reduced to ~12 rain events per year, which is sufficient for the runoff frequency (RO) sub-index to achieve a perfect score, leading to EI~RO~ being near-zero in Fig. `r fig_no`a.  
+Fig. S`r fig_no`a shows the models assume no impervious runoff from the subcatchment before sealing and piping of Wattle Valley Road in 2006, and a reduction in impervious runoff leaving the catchment following installation of SCMs in the subcatchmnent. Fig. S`r fig_no`a, shows that the frequency of overflow from the terminal SCMs in this subcatchment was reduced to ~12 rain events per year, which is sufficient for the runoff frequency sub-index (ESR ) to achieve a perfect score, i.e. *E~SR~* = 1 in Fig. `r fig_no`a.  Conversely, volumes exfiltrated from the terminal raingardens exceeded the target range, resulting in *S~F~* equalling 1, and *E~SF~* equalling *E~S1~*.
 
 ### Logic and use of the EI_subc_time_series and budget_subc_time_series functions
 
