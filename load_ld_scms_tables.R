@@ -89,7 +89,7 @@ siteMap11 <- sites[sites$hydrology == 1,]
 siteMap11$sitecode <- substr(siteMap11$sitecode,1,7)
 siteMap11$col <- catMap11$col[match(siteMap11$sitecode, catMap11$sitecode)]
 
-#Compile summary stats for each site on final date
+# Compile summary stats for each site on final date
 # system.time({
 #   final_stats <- rbind(data.frame(site = "DBS0004",
 #                             EB_subc_on_datex(101, as.Date("2019-12-31"))[-1]),
@@ -104,35 +104,38 @@ siteMap11$col <- catMap11$col[match(siteMap11$sitecode, catMap11$sitecode)]
 #                        data.frame(site = "LIS0004",
 #                                   EB_subc_on_datex(71, as.Date("2019-12-31"))[-1]))
 # })  #~21 minutes
-save(final_stats, file = "data/final_stats.rda", compress = "xz")
+# save(final_stats, file = "data/final_stats.rda", compress = "xz")
+
+load("data/final_stats.rda")
 
 ##### Compile a data frame of TI and EI series for all 11 catchments ####
 
-# #' Calculate time series of EI variants for the 6 experimental catchments
-# #' Indicative calculation times (total for all 6 catchments ~ ~2 h) based 
-# #' on running on a computer with a 3.3 GHz processor, using Linux OS (Ubuntu 18.4)
+#' Calculate time series of EI variants for the 6 experimental catchments
+#' Indicative calculation times (total for all 6 catchments ~ ~2 h) based
+#' on running on a computer with a 3.3 GHz processor, using Linux OS (Ubuntu 18.4)
 # system.time(ei_74 <- EI_subc_time_series(74))   #~2 min (pipeID 74 = L1)
 # system.time(ei_53 <- EI_subc_time_series(53))   #~11 min (pipeID 53 = Ln)
 # system.time(ei_36 <- EI_subc_time_series(36))   #~22 min (pipeID 36 = Ls)
 # system.time(ei_101 <- EI_subc_time_series(101)) #~12 min (pipeID 101 = D4)
 # system.time(ei_71 <- EI_subc_time_series(71))   #~38 min (pipeID 71 = L4)
 # system.time(ei_103 <- EI_subc_time_series(103)) #21 min (pipeID 103 = D8)
-# # save(ei_53,ei_36,ei_74,ei_101,ei_71,ei_103, file = "data/ei_ts.rda", compress = "xz")
+# save(ei_53,ei_36,ei_74,ei_101,ei_71,ei_103, file = "data/ei_ts.rda", compress = "xz")
 load(here::here("data","/ei_ts.rda"))
 
-ei_ts <- rbind(
-  data.frame(sitecode = "LSN0001", ei_53$iats[,c("date","ti","ei")],
+ei_ts_all <- rbind(
+  data.frame(sitecode = "LSN0001", ei_53$iats[,c("date","ti","ei","eb","wq","fv","vr","ro","s")],
              stringsAsFactors = FALSE),
-  data.frame(sitecode = "LSS0001", ei_36$iats[,c("date","ti","ei")],
+  data.frame(sitecode = "LSS0001", ei_36$iats[,c("date","ti","ei","eb","wq","fv","vr","ro","s")],
              stringsAsFactors = FALSE),
-  data.frame(sitecode = "LIS0001", ei_74$iats[,c("date","ti","ei")],
+  data.frame(sitecode = "LIS0001", ei_74$iats[,c("date","ti","ei","eb","wq","fv","vr","ro","s")],
              stringsAsFactors = FALSE),
-  data.frame(sitecode = "LIS0004", ei_71$iats[,c("date","ti","ei")],
+  data.frame(sitecode = "LIS0004", ei_71$iats[,c("date","ti","ei","eb","wq","fv","vr","ro","s")],
              stringsAsFactors = FALSE),
-  data.frame(sitecode = "DBS0004", ei_101$iats[,c("date","ti","ei")],
+  data.frame(sitecode = "DBS0004", ei_101$iats[,c("date","ti","ei","eb","wq","fv","vr","ro","s")],
              stringsAsFactors = FALSE),
-  data.frame(sitecode = "DBS0008", ei_103$iats[,c("date","ti","ei")],
+  data.frame(sitecode = "DBS0008", ei_103$iats[,c("date","ti","ei","eb","wq","fv","vr","ro","s")],
              stringsAsFactors = FALSE))
+ei_ts <- ei_ts_all[c("sitecode","date","ti","ei")]
 
 #### Sa aka SAS0002 ####
 sasIA <- catIA[catIA$subc == "SAS0002",]
