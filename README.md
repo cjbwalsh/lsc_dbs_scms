@@ -11,3 +11,5 @@ The data were originally stored as a postgreSQL database, with this structure.
 
 
 The script `compile_ld_scms_db_from_tables.R` provides guidance on reconstructing the database locally.
+
+The R scripts require the following packages to be installed: "scales", "dplyr", "lubridate", "sf", "here", "RPostgreSQL", "mcr", "RColorBrewer", "data.table", "RMySQL", "DiagrammeR", anf "flextable".
