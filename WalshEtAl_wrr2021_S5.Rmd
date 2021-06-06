@@ -137,6 +137,8 @@ mod_fixed_t_y1 <- lme4::lmer(y1 ~ t_scaled + lei_s1 + del_ei_s + (1|site), data 
 mod_random_t_y1 <- lme4::lmer(y1 ~ lei_s1 + del_ei_s + (1|site) + (1|t_fac), data = sim_set)
 mod_no_t_y1 <- lme4::lmer(y1 ~ lei_s1 + del_ei_s + (1|site), data = sim_set)
 
+mod_fixed_t_varslp <- lme4::lmer(y ~ t + lei_s1 + del_ei_s + (1|site), data = sim_set)
+
 p1 <- sjPlot::plot_model(mod_fixed_t, 
                          title = "A. y, fixed t effect", axis.lim = c(-2,2))
 p2 <- sjPlot::plot_model(mod_fixed_t_y1, 
@@ -172,58 +174,71 @@ mod_fixed_t_auto <- lme4::lmer(y1 ~ t_scaled + lei_s1 + del_ei_s + auto_t + (1|s
 Including a fixed t variable makes a temporal autocorrelation term unworkable (at least in this example, and even in the no_t model, which is odd.  Time to move to stan...)
 
 ```{r}
-# Model matrix for Stan model
-X <- model.matrix(~ lei_s1 + del_ei_s + t_scaled, sim_set)
 # Prepare set of values for the model to predict to
-del_ei <- seq(-1,0, length = 15)
-#make relevant del_ei values equal actual achieved reductions
-del_ei[7] <- min(sim_set$del_ei_s[sim_set$site == "LSN0001"])
-del_ei[14] <- min(sim_set$del_ei_s[sim_set$site == "LIS0001"])
-del_ei[12] <- min(sim_set$del_ei_s[sim_set$site == "LSS0001"])
-del_ei <- c(del_ei[1:11],min(sim_set$del_ei_s[sim_set$site == "DBS0004"]),del_ei[14:15])
+del_ei_p <- seq(-1,0, length = 15)
+#make relevant del_ei_p values equal actual achieved reductions
+del_ei_p[7] <- min(sim_set$del_ei_s[sim_set$site == "LSN0001"])
+del_ei_p[14] <- min(sim_set$del_ei_s[sim_set$site == "LIS0001"])
+del_ei_p[12] <- min(sim_set$del_ei_s[sim_set$site == "LSS0001"])
+del_ei_p <- c(del_ei_p[1:11],min(sim_set$del_ei_s[sim_set$site == "DBS0004"]),
+              del_ei_p[14:15])
 # Make predictions for a reference site, a control site and the 4 experimental 
-# sites used in sim_setwith ei set at level at end of experiment
+# sites used in sim_set with ei set at level at end of experiment
 ei <- ei_ts$lei[ei_ts$sitecode %in% c("LYR0007","BRS0015","DBS0004",
                                    "LSN0001","LIS0001","LSS0001") & 
                 ei_ts$date == max(ei_ts$date)]
-new_X <- model.matrix(~ lei_s1 + del_ei_s + t_scaled,
-                      expand.grid(lei_s1 = ei,
-                                  del_ei_s = del_ei, 
-                                  t_scaled = max(sim_set$t_scaled)))
-dataList <- list(N = dim(X)[1],
+new_X <- model.matrix(~ ei_p + del_ei_p + t_scaled_p + site_p,
+                      expand.grid(ei_p = ei,
+                                  del_ei_p = del_ei, 
+                                  t_scaled_p = max(sim_set$t_scaled),
+                                  site_p = 1:9))
+data_list <- list(N = dim(sim_set)[1],
                  N2 = dim(new_X)[1],
-                 K = dim(X)[2],
                  G = length(sitecodes),
                  y = sim_set$y1,
-                 site = as.numeric(match(sim_set$site, sitecodes)),
-                 X = X, new_X = new_X)
+                 ei = sim_set$lei_s1,
+                 del_ei = sim_set$del_ei_s,
+                 t_scaled = sim_set$t_scaled,
+                 site = match(sim_set$site, sitecodes),
+                 ei_p = new_X[,2],
+                 del_ei_p = new_X[,3],
+                 t_scaled_p = new_X[,4],
+                 site_p = new_X[,5])
 
-pars_to_sample <- c("beta","gamma", "sigma_e","log_lik","new_y_pred","y_pred")
+pars_to_sample <- c("beta_intercept","beta_ei", "beta_del_ei", "beta_t_scaled",
+                    "sigma_e","new_y_pred") 
+  #"log_lik","new_y_pred" - can also be saved for model fitting etc.
 nChains <- 4
-nIter <- 4000
-nWarmup <- 2000
-sim_set_mod <-stan(file = "X4_site_newX.stan",  #
-                    data = dataList, chains = nChains, iter = nIter,
+nIter <- 7500
+nWarmup <- 4500
+sim_set_mod <-stan(file = "code/sim_set_vary_t.stan",  
+                    data = data_list, chains = nChains, iter = nIter,
                     warmup = nWarmup, save_warmup = FALSE,
                     pars =  pars_to_sample,
-                    control = list(adapt_delta = 0.95, max_treedepth = 15),
-                    seed = 787603905) 
+                    control = list(adapt_delta = 0.99, max_treedepth = 15),
+                    seed = -237947234) 
 ```
 
 ```{r eval=FALSE, engine="stan"}
 data {
-int<lower=1> N; // number of data points
-int<lower=1> N2; // the size of the new_X matrix for model prediction
-int<lower=1> K; // the number of columns in the model matrix
-int<lower=1> G; // the number of sites
-real y[N]; // response variable
-matrix[N,K] X; // the model matrix
-int<lower=1, upper=G> site[N]; // site id
-matrix[N2,4] new_X; // the matrix for the predicted values
+int<lower=1> N;     // number of data points
+int<lower=1> N2;    // the number of rows in model prediction data set
+int<lower=1> G;     // the number of sites (grouping variable)
+real y[N];          // response variable
+real ei[N];         // EI predictor variable
+real del_ei[N];     // delta-EI predictor variable
+real t_scaled[N];   // time predictor variable
+int<lower=1, upper=G> site[N]; // site predictor variable
+real ei_p[N];       // EI predictor variable for prediction data set
+real del_ei_p[N];   // delta-EI predictor variable for prediction data set
+real t_scaled_p[N]; // time predictor variable for prediction data set
 }
 
 parameters {
-vector[K] beta; // the regression parameters (applied to X)
+real beta_intercept; // the intercept regression parameter
+real beta_ei;        // the ei regression parameter
+real beta_del_ei;    // the del_ei regression parameter
+real beta_t_scaled;    // the del_ei regression parameter
 vector[G] gamma; // //the random site parameter
 real<lower=0> sigma_e; //the error sd
 real<lower=0> gamma_sigma; //sd of random site effect
@@ -232,36 +247,38 @@ real<lower=0> gamma_sigma; //sd of random site effect
  model {  
   sigma_e ~ cauchy(0,2.5);
   gamma_sigma ~ cauchy(0,2.5);
-
-  for(i in 1:K){
-    beta[i] ~ normal(0,5);
+  beta_intercept[i] ~ normal(0,5);
+  beta_ei[i] ~ normal(0,5);
+  beta_del_ei[i] ~ normal(0,5);
+  beta_t_scaled[i] ~ normal(0,5);
   }
   
   for(i in 1:G){
    gamma[i] ~ normal(0,gamma_sigma); 
   }
 
-// The 8 predictors in X are (in order):
-// ei, del_ei, rain1, rain365, channel, ei*rain1, and del_ei*rain1
   for (i in 1:N)  {
-    y[i] ~ normal(beta[1]*X[i,1] + beta[2]*X[i,2] + 
-                  beta[3]*X[i,3] + beta[4]*X[i,4] + gamma[site[i]], sigma_e);
+    y[i] ~ normal(beta_intercept + beta_ei * ei[i] + beta_del_ei * del_ei[i] +
+                  beta_t_scaled * t_scaled[i] + gamma[site[i]], sigma_e);
 }
 }
 
 generated quantities {
-vector[N2] new_y_pred; //predicted values on evenly spaced major predictor variables
-vector[N] y_pred;  //predicted values for evaluating fit
-vector[N] log_lik;  //log-likelihood for calculating WAIC and loo
+vector[N2] new_y_pred; // predicted values on evenly spaced major predictor variables
+vector[N] y_pred;      // predicted values for evaluating fit
+vector[N] log_lik;     // log-likelihood for calculating WAIC and loo
 for(i in 1:N2){
-   new_y_pred[i] = beta[1]*new_X[i,1] + beta[2]*new_X[i,2] +
-                  beta[3]*new_X[i,3] + beta[4]*new_X[i,4]; //the y values predicted by the model
+   new_y_pred[i] = beta_intercept + beta_ei * ei_p[i] + beta_del_ei * del_ei+p[i] +
+                  beta_t_scaled * t_scaled_p[i]; //the y values predicted by the model
    }
 for(i in 1:N){
-  y_pred[i] = beta[1]*X[i,1] + beta[2]*X[i,2] +
-                  beta[3]*X[i,3] + beta[4]*X[i,4] + gamma[site[i]];
+  y_pred[i] = beta_intercept + beta_ei * ei[i] + beta_del_ei * del_ei[i] +
+                  beta_t_scaled * t_scaled[i] + gamma[site[i]];
    }
-for (i in 1:N) log_lik[i] = normal_lpdf(y[i] | (beta[1]*X[i,1] + beta[2]*X[i,2] +
-                  beta[3]*X[i,3] + beta[4]*X[i,4] + gamma[site[i]]), sigma_e);
+for (i in 1:N) log_lik[i] = normal_lpdf(y[i] | (beta_intercept + 
+                                                beta_ei * ei[i] + 
+                                                beta_del_ei * del_ei[i] +
+                                                beta_t_scaled * t_scaled[i] + 
+                                                gamma[site[i]]), sigma_e);
 }
 ```

@@ -3,6 +3,7 @@
 .RData
 .Ruserdata
 scratch.R
+*.rds
 *.docx
 !officedown_template.docx
 data/*.gpkg
