@@ -1,0 +1,267 @@
+---
+title: 'Linking stormwater control performance to stream ecosystem outcomes: incorporating performance metrics into effective imperviousness'
+subtitle: 'Supplementary material S5'
+author: 'Christopher J. Walsh, Matthew J. Burns, Tim D. Fletcher, Darren G. Bos, Peter Poelsma, Joshphar Kunapo and Sam J. Imberger'
+date: 'School of Ecosystem and Forest Sciences, The University of Melbourne, 500 Yarra Boulevard, Burnley Victoria 3121, Australia '
+output: 
+  word_document:
+    reference_docx: officedown_template.docx
+csl: water-resources-research.csl
+bibliography: references.bib
+---
+```{r  load_data, include = FALSE}
+knitr::opts_chunk$set(echo = TRUE, dev = "pdf", message=FALSE) #,dpi = 200 
+requiredPackages <- c("rstan","loo","coda","sjPlot")
+lapply(requiredPackages, require, character.only = TRUE)
+rstan_options(auto_write = TRUE)
+options(mc.cores = 4)
+source("load_ld_scms_tables.R")
+fig_no <- 11 + 1  #Fig. S11 last figure in S4
+set.seed(787603905)  
+#to get a consistent result: perhaps 1 in 2 seeds result in lmer models with t (random or fixed) being singular
+```
+
+### S5. Statistical model for assessing stream responses to stormwater control measures
+
+Here, we describe a general statistic model for assessing in-stream response to catchment-scale stormwater control in urbanized catchments using a Before-After-Reference-Control-Impact experimental design, such as described in this paper, where the after period is characterised by a protracted period of increased stormwater control (the 'impact'), and the degree of stormwater control varies widely among the 'impact' sites.  
+
+We simulated contrasting response data to illustrate the model's ability to detect change in variables with differing responses to stormwater control. We used a simplified version of our study's data. To remove the complication of L4 and D8 being downstream of other sites (requiring introduction of a spatial autocorrelation term), we constructed a data set of predictor variables for the 9 other sites, which are independent of each other. 
+
+The simulated data set was populated with four samples per year from 2001 to 2019, from each of the 9 sites, and each date was attributed the observed values of *EI~S1* and $\Delta$*EI~S~*.
+
+```{r prepare_sim_set, fig.width = 7, fig.height = 3}
+dates <- seq.Date(from = as.Date("2001-02-01"),
+                  to = as.Date("2019-11-01"), 
+                  by = "3 months")
+t <- 1:length(dates)
+sitecodes <- siteMap11$sitecode[!siteMap11$sitecode %in% c("LIS0004","DBS0008")]
+
+ei_ts$lei <- log10(ei_ts$ei*100 + 0.1)
+ei_ts$lei_s <- ei_ts$lei_s0 <- ei_ts$lei
+exp_cats <- unique(ei_ts_all$sitecode)
+for(i in 1:length(exp_cats)){
+  ei_ts$lei_s[ei_ts$sitecode == exp_cats[i]] <- log10(ei_ts_all$eb[ei_ts_all$sitecode == exp_cats[i]]*100 + 0.1)
+  ei_ts$lei_s0[ei_ts$sitecode == exp_cats[i]] <- log10(ei_ts_all$s[ei_ts_all$sitecode == exp_cats[i]]*100 + 0.1)
+}
+ei_ts$del_ei_s <-  ei_ts$lei_s - ei_ts$lei
+
+sim_set <- data.frame(site = rep(sitecodes, each = length(t)),
+                      date = rep(dates, length(sitecodes)),
+                      t = rep(t, length(sitecodes)),
+                      lei_s1 = NA, del_ei_s = NA)
+
+for(i in 1:length(sitecodes)){
+  sim_set$lei_s1[sim_set$site == sitecodes[i]] <- 
+    ei_ts$lei[ei_ts$sitecode == sitecodes[i] & ei_ts$date %in% sim_set$date]
+  sim_set$del_ei_s[sim_set$site == sitecodes[i]] <- 
+    ei_ts$del_ei_s[ei_ts$sitecode == sitecodes[i] & ei_ts$date %in% sim_set$date]
+}
+
+layout(matrix(1:3,1,3,byrow=TRUE),widths = c(10,10,2))
+plot(jitter(sim_set$t, factor = 2), jitter(sim_set$del_ei_s, factor = 4), 
+     col = RColorBrewer::brewer.pal(9,"Set1")[match(sim_set$site, sitecodes)],
+     ylab = expression(~Delta~EI[S]), xlab = "time (t)", las = 1)
+title(main = "A.", adj = 0)
+plot(jitter(sim_set$t, factor = 2), jitter(sim_set$lei_s1, factor = 4), 
+     col = RColorBrewer::brewer.pal(9,"Set1")[match(sim_set$site, sitecodes)],
+     ylab = expression(log[10](EI[S1] + 0.1)), xlab = "Time (t)", las = 1)
+title(main = "B.", adj = 0)
+par(mar = c(0,0,0,0))
+plot.new()
+legend("center",pch = 1, col = RColorBrewer::brewer.pal(9,"Set1"), legend = sitecodes, 
+       title = "Site", cex = 1)
+```
+Fig.S`r fig_no`. Distributions of A. $\Delta$*EI~S~* and B. log(*EI~S1*) as a function of t, the 80 sampling dates in the simulated dataset.  _(I need to confirm the non-zero $\Delta$*EI~S~* values in the before period)_.  
+The simulated response variables —-- y and y1 --- were hypothetical versions of log(FRP). Individual samples of y and y1 varied among sites as a function of EI as observed for log(median FRP) (Fig. 1A). 
+
+The 20-year study period was characterised by a shift from very dry conditions of the milennium drought in the first decade to more average conditions in the second.  It is therefore conceivable that in-stream response variables varied over that time in response to increasingly wet conditions. For instance, increasingly wet catchments could have increased the contribution of ground water to stream flows, and this effect may have been greater in more urban streams.  If there were such a long-term change in stream variables over the study period, there is potential for collinearity between the long-term change, urban growth captured in log(*EI~S1*) (Fig. S`r fig_no`), and the linear decrease in $\Delta$*EI~S~* as SCMs were installed in the experiment.  To ensure that the model adequately controls for such potential collinearity, we added a linear increase to y and y1 over the study period.
+
+We made no further manipulation of variable y: this variable was thus comparable to FRP observed in the study, but showed no response to $\Delta$*EI~S~*.  In contrast, 
+
+```{r, fig.width = 7, fig.height = 6}
+ lFRP50 <- c(-1.56864E+00, -2.22185E+00, -2.09691E+00, -2.22185E+00, -2.52288E+00, -1.88606E+00, -2.04576E+00, -2.52288E+00, -2.52288E+00, -2.69897E+00, -2.00000E+00, -2.39794E+00, -1.92082E+00, -1.92082E+00)
+ EI <- c(1.95167E-01, 4.26416E-03, 3.62570E-02, 4.19733E-03, 0.00000E+00, 9.52280E-02, 4.63966E-01, 0.00000E+00, 0.00000E+00, 1.16397E-03, 1.03733E-02, 6.65377E-03, 3.82980E-01, 5.47130E-02)
+mod_frp_ei <- lm(lFRP50 ~ EI)
+# 1. vary among sites as a function of EI as observed for log(median FRP)
+sim_set$y <- rnorm(dim(sim_set)[1], 
+                   summary(mod_frp_ei)$coefficients[1,1],
+                   summary(mod_frp_ei)$coefficients[1,2]) +  #distribution of model intercept
+             summary(mod_frp_ei)$coefficients[2,1] * sim_set$lei_s1 + #model slope
+             rnorm(dim(sim_set)[1], 0,
+                   summary(mod_frp_ei)$coefficients[2,2])  #distribution of model slope error
+# For the simulation, we allow values of y to fall below the detection limit   
+
+# 2. add a linear increase with time unrelated to the SCM implementation, 
+# and make it a greater increase with greater EI...
+sim_set$y <- sim_set$y + (sim_set$lei_s1 + 1.05)*sim_set$t/160
+
+# 3. create variable y1 so that its response to del_ei equals its response to ei_s1
+sim_set$y1 <- sim_set$y
+sim_set$y1 <- sim_set$y + 
+              summary(mod_frp_ei)$coefficients[2,1] * sim_set$del_ei_s  #model slope
+
+layout(matrix(c(1:5,3),2,3,byrow=TRUE),widths = c(10,10,2), heights = c(10,10))
+plot(sim_set$lei_s1, sim_set$y, 
+     col = RColorBrewer::brewer.pal(9,"Set1")[match(sim_set$site, sitecodes)],
+     xlab = expression(log[10](EI[S1] + 0.1)), ylab = "y", las = 1)
+title(main = "A.", adj = 0)
+plot(sim_set$lei_s1, sim_set$y1, 
+     col = RColorBrewer::brewer.pal(9,"Set1")[match(sim_set$site, sitecodes)],
+     xlab = expression(log[10](EI[S1] + 0.1)), ylab = "y", las = 1)
+title(main = "B.", adj = 0)
+par(mar = c(0,0,0,0))
+plot.new()
+legend("center",pch = 1, col = RColorBrewer::brewer.pal(9,"Set1"), legend = sitecodes, 
+       title = "Site", cex = 1)
+par(mar = c(4,4,1,1))
+plot(sim_set$del_ei_s, sim_set$y, 
+     col = RColorBrewer::brewer.pal(9,"Set1")[match(sim_set$site, sitecodes)],
+     xlab = expression(~Delta~EI[S]), ylab = "y", las = 1)
+title(main = "C.", adj = 0)
+plot(sim_set$del_ei_s, sim_set$y1, 
+     col = RColorBrewer::brewer.pal(9,"Set1")[match(sim_set$site, sitecodes)],
+     xlab = expression(~Delta~EI[S]), ylab = "y1", las = 1)
+title(main = "D.", adj = 0)
+
+```
+
+
+```{r, fig.width = 7, fig.height = 9}
+sim_set$t_scaled <- (sim_set$t - 38.5)/25
+mod_fixed_t <- lme4::lmer(y ~ t_scaled + lei_s1 + del_ei_s + (1|site), data = sim_set)
+sim_set$t_fac <- factor(t)
+mod_random_t <- lme4::lmer(y ~ lei_s1 + del_ei_s + (1|site) + (1|t_fac), data = sim_set)
+mod_no_t <- lme4::lmer(y ~ lei_s1 + del_ei_s + (1|site), data = sim_set)
+
+mod_fixed_t_y1 <- lme4::lmer(y1 ~ t_scaled + lei_s1 + del_ei_s + (1|site), data = sim_set)
+mod_random_t_y1 <- lme4::lmer(y1 ~ lei_s1 + del_ei_s + (1|site) + (1|t_fac), data = sim_set)
+mod_no_t_y1 <- lme4::lmer(y1 ~ lei_s1 + del_ei_s + (1|site), data = sim_set)
+
+p1 <- sjPlot::plot_model(mod_fixed_t, 
+                         title = "A. y, fixed t effect", axis.lim = c(-2,2))
+p2 <- sjPlot::plot_model(mod_fixed_t_y1, 
+                         title = "B. y1, fixed t effect", axis.lim = c(-2,2))
+p3 <- sjPlot::plot_model(mod_random_t, 
+                         title = "C. y, random t effect", axis.lim = c(-2,2))
+p4 <- sjPlot::plot_model(mod_random_t_y1, 
+                         title = "D. y1, random t effect", axis.lim = c(-2,2))
+p5 <- sjPlot::plot_model(mod_no_t, 
+                         title = "E. y, no t effect", axis.lim = c(-2,2))
+p6 <- sjPlot::plot_model(mod_no_t_y1, 
+                         title = "F. y1, no t effect", axis.lim = c(-2,2))
+gridExtra::grid.arrange(p1, p2, p3, p4, p5, p6, nrow = 3)
+```
+
+This is an initial comparison of models using three different ways to deal with time for us co-authors to consider...not for publication.  To date, we have used a model most like D and E (without a time effect). These are the least satisfactory models, failing to detect the del_ei_s effect of y1, and inferring a negative effect of y, which should have no del_ei_s effect.  The models with a fixed t effect were the most correct.  The models with a random t effect incorrectly inferred a negative effect of del_ei_s on y, and a smaller del_ei_s effect on y1 than the effect of lei_s1 (they should be the same).
+
+```{r, fig.width = 7, fig.height = 9}
+auto_t <- residuals(mod_fixed_t_y1)
+for(i in 1:length(sitecodes)){
+  sim_set$auto_t[sim_set$site == sitecodes[i]] <- c(NA, auto_t[sim_set$site == sitecodes[i]][-1])
+}
+mod_fixed_t_auto <- lme4::lmer(y1 ~ t_scaled + lei_s1 + del_ei_s + auto_t + (1|site), data = sim_set)
+
+# auto_t <- residuals(mod_no_t_y1)
+# for(i in 1:length(sitecodes)){
+#   sim_set$auto_t[sim_set$site == sitecodes[i]] <- c(NA, auto_t[sim_set$site == sitecodes[i]][-1])
+# }
+# mod_no_t_auto <- lme4::lmer(y1 ~ lei_s1 + del_ei_s + auto_t + (1|site), data = sim_set)
+
+```
+
+Including a fixed t variable makes a temporal autocorrelation term unworkable (at least in this example, and even in the no_t model, which is odd.  Time to move to stan...)
+
+```{r}
+# Model matrix for Stan model
+X <- model.matrix(~ lei_s1 + del_ei_s + t_scaled, sim_set)
+# Prepare set of values for the model to predict to
+del_ei <- seq(-1,0, length = 15)
+#make relevant del_ei values equal actual achieved reductions
+del_ei[7] <- min(sim_set$del_ei_s[sim_set$site == "LSN0001"])
+del_ei[14] <- min(sim_set$del_ei_s[sim_set$site == "LIS0001"])
+del_ei[12] <- min(sim_set$del_ei_s[sim_set$site == "LSS0001"])
+del_ei <- c(del_ei[1:11],min(sim_set$del_ei_s[sim_set$site == "DBS0004"]),del_ei[14:15])
+# Make predictions for a reference site, a control site and the 4 experimental 
+# sites used in sim_setwith ei set at level at end of experiment
+ei <- ei_ts$lei[ei_ts$sitecode %in% c("LYR0007","BRS0015","DBS0004",
+                                   "LSN0001","LIS0001","LSS0001") & 
+                ei_ts$date == max(ei_ts$date)]
+new_X <- model.matrix(~ lei_s1 + del_ei_s + t_scaled,
+                      expand.grid(lei_s1 = ei,
+                                  del_ei_s = del_ei, 
+                                  t_scaled = max(sim_set$t_scaled)))
+dataList <- list(N = dim(X)[1],
+                 N2 = dim(new_X)[1],
+                 K = dim(X)[2],
+                 G = length(sitecodes),
+                 y = sim_set$y1,
+                 site = as.numeric(match(sim_set$site, sitecodes)),
+                 X = X, new_X = new_X)
+
+pars_to_sample <- c("beta","gamma", "sigma_e","log_lik","new_y_pred","y_pred")
+nChains <- 4
+nIter <- 4000
+nWarmup <- 2000
+sim_set_mod <-stan(file = "X4_site_newX.stan",  #
+                    data = dataList, chains = nChains, iter = nIter,
+                    warmup = nWarmup, save_warmup = FALSE,
+                    pars =  pars_to_sample,
+                    control = list(adapt_delta = 0.95, max_treedepth = 15),
+                    seed = 787603905) 
+```
+
+```{r eval=FALSE, engine="stan"}
+data {
+int<lower=1> N; // number of data points
+int<lower=1> N2; // the size of the new_X matrix for model prediction
+int<lower=1> K; // the number of columns in the model matrix
+int<lower=1> G; // the number of sites
+real y[N]; // response variable
+matrix[N,K] X; // the model matrix
+int<lower=1, upper=G> site[N]; // site id
+matrix[N2,4] new_X; // the matrix for the predicted values
+}
+
+parameters {
+vector[K] beta; // the regression parameters (applied to X)
+vector[G] gamma; // //the random site parameter
+real<lower=0> sigma_e; //the error sd
+real<lower=0> gamma_sigma; //sd of random site effect
+}
+
+ model {  
+  sigma_e ~ cauchy(0,2.5);
+  gamma_sigma ~ cauchy(0,2.5);
+
+  for(i in 1:K){
+    beta[i] ~ normal(0,5);
+  }
+  
+  for(i in 1:G){
+   gamma[i] ~ normal(0,gamma_sigma); 
+  }
+
+// The 8 predictors in X are (in order):
+// ei, del_ei, rain1, rain365, channel, ei*rain1, and del_ei*rain1
+  for (i in 1:N)  {
+    y[i] ~ normal(beta[1]*X[i,1] + beta[2]*X[i,2] + 
+                  beta[3]*X[i,3] + beta[4]*X[i,4] + gamma[site[i]], sigma_e);
+}
+}
+
+generated quantities {
+vector[N2] new_y_pred; //predicted values on evenly spaced major predictor variables
+vector[N] y_pred;  //predicted values for evaluating fit
+vector[N] log_lik;  //log-likelihood for calculating WAIC and loo
+for(i in 1:N2){
+   new_y_pred[i] = beta[1]*new_X[i,1] + beta[2]*new_X[i,2] +
+                  beta[3]*new_X[i,3] + beta[4]*new_X[i,4]; //the y values predicted by the model
+   }
+for(i in 1:N){
+  y_pred[i] = beta[1]*X[i,1] + beta[2]*X[i,2] +
+                  beta[3]*X[i,3] + beta[4]*X[i,4] + gamma[site[i]];
+   }
+for (i in 1:N) log_lik[i] = normal_lpdf(y[i] | (beta[1]*X[i,1] + beta[2]*X[i,2] +
+                  beta[3]*X[i,3] + beta[4]*X[i,4] + gamma[site[i]]), sigma_e);
+}
+```
