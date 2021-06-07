@@ -1,6 +1,6 @@
 ---
 title: 'Linking stormwater control performance to stream ecosystem outcomes: incorporating performance metrics into effective imperviousness'
-subtitle: 'Supplementary material S1, S2, S3'
+subtitle: 'Supplementary material S1, S2, S3, S4'
 author: 'Christopher J. Walsh, Matthew J. Burns, Tim D. Fletcher, Darren G. Bos, Peter Poelsma, Joshphar Kunapo and Sam J. Imberger'
 date: 'School of Ecosystem and Forest Sciences, The University of Melbourne, 500 Yarra Boulevard, Burnley Victoria 3121, Australia '
 output: 
