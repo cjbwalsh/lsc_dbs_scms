@@ -87,7 +87,7 @@ ft
 ##### page break
 
 ```{r frp_v_ei, warning=FALSE, message=FALSE, fig.width = 7.48, fig.height = 3.5}
-#pdf("Fig1_frp_signal.pdf", width = 7.48, height = 3.5)
+pdf("images/Fig1_frp_signal.pdf", width = 7.48, height = 3.5)
 layout(matrix(c(1,2,3,3), 2, 2, byrow = TRUE), heights = c(10,1), widths = c(10,10))
 par(mar = c(2,4,1,1))
 #data used by Walsh et al 2005 taken from "SUSE NABS issue/FRP stats/data.txt"
@@ -111,7 +111,7 @@ par(mar = c(2,4,1,1))
          c(yupper,rev(ylower)), col = gray(0.75), border = gray(0.75))
  lines(log10(xgon + 0.001),y)
  axis(1, at = c(-3.5,log10(c(0,0.003,0.01,0.03,0.1,0.3)+0.001)),
-                labels = c("",c(0,0.003,0.01,0.03,0.1,0.3)))
+                labels = c("",c(0,0.003,0.01,0.03,0.1,0.3)*100))
  axis(2, at = log10(c(0.0001,0.001,0.003,0.01,0.03,0.1,0.3,1,3,10,30)),
       lab = c("",0.001,0.003,0.01,0.03,0.1,0.3,"1.0","3.0",10,30), las = 1)
  title(ylab = "Median FRP (mg/L)")
@@ -133,7 +133,7 @@ EI_sig <- c(3.87607E-02, 1.95167E-01, 4.26416E-03, 3.62570E-02, 4.19733E-03, 0.0
       xlim = c(-3,-0.39), ylim = c(3,8), axes = FALSE,
       xlab = "", ylab = "")
  axis(1, at = c(-3.5,log10(c(0,0.003,0.01,0.03,0.1,0.3)+0.001)),
-                labels = c("",c(0,0.003,0.01,0.03,0.1,0.3)))
+                labels = c("",c(0,0.003,0.01,0.03,0.1,0.3)*100))
  axis(2, at = 1:9, las = 1)
  title(ylab = "SIGNAL score")
 
@@ -158,9 +158,8 @@ EI_sig <- c(3.87607E-02, 1.95167E-01, 4.26416E-03, 3.62570E-02, 4.19733E-03, 0.0
  title(main = "b.", adj = 0)
  par(mar = c(0,0,0,0))
  plot.new()
-  title(xlab = "             Proportion effective imperviousness", line = -1)
-
-# dev.off()
+  title(xlab = "             Effective imperviousness (%)", line = -1)
+dev.off()
  
 ```
   
