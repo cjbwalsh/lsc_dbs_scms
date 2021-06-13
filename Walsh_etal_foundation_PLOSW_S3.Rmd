@@ -1,0 +1,323 @@
+---
+title: 'Linking stormwater control performance to stream ecosystem outcomes: incorporating a performance metric into effective imperviousness'
+subtitle: 'S3 Appendix. Stormwater control measure specification and location data'
+author: 'Christopher J. Walsh, Matthew J. Burns, Tim D. Fletcher, Darren G. Bos, Peter Poelsma, Joshphar Kunapo and Sam J. Imberger'
+date: 'School of Ecosystem and Forest Sciences, The University of Melbourne, 500 Yarra Boulevard, Burnley Victoria 3121, Australia '
+output: 
+  word_document:
+    reference_docx: officedown_template.docx
+csl: plos.csl
+bibliography: references.bib
+---
+
+```{r load_data, include = FALSE}
+knitr::opts_chunk$set(echo = TRUE, dev = "pdf", message=FALSE) #,dpi = 200 
+source("code/BACRIfunctions.R")  
+# also loads required packages(scales, dplyr, lubridate, sf, here, RPostgreSQL,
+#                              mcr, RColorBrewer, data.table, RMySQL,"DiagrammeR")
+source("code/download.OSF.file.R")
+# also loads required packages (httr rjson, here)
+source("load_ld_scms_tables.R")
+# this script downloads data files from the OSF repository to the local directory
+example_pipeID <- 29 # used in S3
+fig_no <- 1          # used throughout to number figures.
+```
+
+
+  
+Data detailing the specifications of all stormwater control measures (SCMs) in the two experimental catchments (Little Stringybark and Dobsons) were compiled into a postgreSQL database (Fig. S3-`r fig_no`). The constituent tables of the database are stored in an Open Science Framework repository [@walsh_etal_2021]: https://osf.io/57azq/. Spatial tables are stored in the spatial_data component of the repository, and non-spatial tables are stored in the linked data directory of the github repository https://github.com/cjbwalsh/lsc_dbs_scms.  The script `compile_ld_scms_db_from_tables.R` in the repository provides guidance on reconstructing the database locally. This document desribes the database tables and their relationships.  
+  
+```{r, include=TRUE, echo=FALSE, fig.width=6.75, fig.height = 3.5}
+#ER diagram generated in dBeaver, and printed to pdf (paper size Choukei 3 envelope).
+knitr::include_graphics("images/ld_scms_ER_diagram.pdf")
+```
+
+#### Fig. S3-`r fig_no`. Tables and their relationships in database of stormwater control measures in the Little Stringybark and Dobsons Creek catchments. Spatial tables can be identified by their geometry field.
+  
+  
+  
+Each catchment was divided at two scales: into (property and road) parcels, and into pipe subcatchments that permit calculation of impervious runoff and fluxes of waters into and out of SCMs at the property, pipe subcatchment and catchment scale. Specifications of tanks, raingardens and downpipe diverters permit modelling of individual SCMs and treatment trains of SCMs that drain to each other.  Dates of changes in impervious coverage, in installation, decommissioning and specifications of SCMs, permit calculation of time series of fluxes at all scales.
+
+The following description of the constituent tables explains the logic underlying the dataset and its use.  
+  
+```{r figS3_pipeIDmap, echo = FALSE, warning=FALSE, message=FALSE, fig.width = 7, fig.height = 4}
+fig_no <- fig_no + 1
+par(mar = c(0,0,0,0),mfrow = c(1,2))
+plot(subcs$geometry[subcs$pipeID < 100]) #LSC pipeIDs < 100, DBS pipe IDs > 100
+scCentroids <- sf::st_centroid(subcs$geometry[subcs$pipeID < 100])
+plot(streams$geometry[is.na(streams$streamName) | 
+                        streams$streamName %in% c("LITTLE STRINGYBARK CREEK",
+                                                  "WATTLE VALLEY CREEK")], 
+     col = "darkblue", add = TRUE)
+plot(sites$geometry[sites$hydrology == 1], pch = 21,bg = gray(0.5), add = TRUE)
+text(sf::st_coordinates(scCentroids)[,1], sf::st_coordinates(scCentroids)[,2] + 30, 
+     subcs$pipeID[subcs$pipeID < 100], cex = 0.5)
+text(sf::st_coordinates(scCentroids)[,1], sf::st_coordinates(scCentroids)[,2] - 30, 
+     paste(subcs$nextds[subcs$pipeID < 100], sep = ""), cex = 0.5, font = 3, col = "red")
+title(main = "A. Little Stringybark Creek", adj = 0, line = -1, font.main = 1, cex.main = 0.8)
+
+plot(subcs$geometry[subcs$pipeID > 100])
+scCentroids <- sf::st_centroid(subcs$geometry[subcs$pipeID > 100])
+suppressWarnings(plot(sf::st_intersection(streams, subcs)$geometry, col = "darkblue", add = TRUE))
+plot(sites$geometry[sites$hydrology == 1], pch = 21,bg = gray(0.5), add = TRUE)
+text(sf::st_coordinates(scCentroids)[,1], sf::st_coordinates(scCentroids)[,2] + 60, 
+     subcs$pipeID[subcs$pipeID > 100], cex = 0.5)
+text(sf::st_coordinates(scCentroids)[,1], sf::st_coordinates(scCentroids)[,2] - 60, 
+     paste(subcs$nextds[subcs$pipeID > 100], sep = ""), cex = 0.5, font = 3, col = "red")
+title(main = "B. Dobsons Creek", adj = 0, line = -1, font.main = 1, cex.main = 0.8)
+```
+  
+#### Fig. S3-`r fig_no`. Maps of 'pipe' subcatchments used to partition the study catchments of A. Little Stringybark Creek (LSC) and B. Dobsons Creek. The pipeID of each subcatchment is indicated in black, and the next pipeID downstream is indicated in red, italic font. The locations of the 5 LSC and 3 DBS flow gauges used in the study are indicated as gray circles.  
+
+### Table subcs (pipe subcatchments)  
+
+The catchments of the two most downstream experimental sites (D8 and L4) are divided into subcatchments (identified by unique pipeIDs, Fig. S3-`r fig_no`) that permit modelling of impervious runoff and SCM performance at a range of scales. Subcatchments were selected:  
+
+1. at the outlet of pipes which are (or potentially could be) intercepted by an SCM before entering the stream;  
+
+2. at segments along streams upstream of a pipe subcatchment outlet;  
+
+3. at the locations of sampling reaches or gauges.  
+
+The field "pipeName" gives meaningful names to each pipeID either by a street name, or the name of an SCM or the code for a sampling site. The field "nextds" identifies the next pipeID downstream (see Fig. S3-`r fig_no`), allowing compilation of all upstream pipeIDs using the function allupstream(). "scarea" is the area of the subcatchment polygon in m^2^, and "carea" is the total upstream catchment area for each subcatchment (also in m^2^).  "trib" is the gauge site that the subcatchment lies in (i.e. L4, L1, Ln, Ls, D4 or D8).  
+ 
+```{r figS3-4_parcelMap, echo = FALSE, warning=FALSE, message=FALSE, fig.width = 7, fig.height = 4}
+fig_no <- fig_no + 1
+par(mar = c(0,0,0,0),mfrow = c(1,2))
+plot(parcels$geometry[parcels$parcelType == "property" & parcels$pipeID < 100], border = "#fc8d62")
+plot(parcels$geometry[parcels$parcelType == "road" & parcels$pipeID < 100], border = "#66c2a5", add = TRUE)
+suppressWarnings(plot(sf::st_intersection(streams, subcs)$geometry, col = "darkblue", add = TRUE))
+title(main = "A. Little Stringybark Creek", adj = 0, line = -1, font.main = 1, cex.main = 0.8)
+
+plot(parcels$geometry[parcels$parcelType == "property" & parcels$pipeID > 100], border = "#fc8d62")
+plot(parcels$geometry[parcels$parcelType == "road" & parcels$pipeID > 100], border = "#66c2a5", add = TRUE)
+suppressWarnings(plot(sf::st_intersection(streams, subcs)$geometry, col = "darkblue", add = TRUE))
+title(main = "B. Dobsons Creek", adj = 0, line = -1, font.main = 1, cex.main = 0.8)
+```
+  
+#### Fig. S3-`r fig_no`. Maps of road (green) and property (orange) parcels of A. Little Stringybark Creek (LSC) and B. Dobsons Creek. .  
+
+### Table parcels  
+
+The catchments of the two most downstream experimental sites were also divided into parcels:  
+
+- property parcels, obtained from the government cadastre (land.vic.gov.au), cut to the catchment boundaries of D8 and L4 using the intersect function in QGIS. Some manual editing of the resulting property parcel layer was required to a) combine parcels on several properties that functioned as single properties, but were mapped as multiple titles, b) split several parcels that had been recently subdivided; and c) split any property parcels that spanned two pipe subcatchments and that had impervious areas that drained to different subcatchments. The last case was rare, and restricted to some larger properties: most properties had a single point of legal discharge to which stormwater runoff was required to drain.
+
+- road parcels, obtained using the difference function in QGIS (between the property parcel and the catchment boundary layers) to identify the road reserves of each pipe subcatchment, as the cadastre has gaps for road reserves. This extracted road reserve layer was manually split (using the split features tool) at intersections, and a unique parcelID was created for each newly created road parcel. 
+
+Property and road parcels were combined into a single spatial table, parcels (Fig. S3-`r fig_no`).   
+  
+```{r figS5_iaMap, echo = FALSE, warning=FALSE, message=FALSE, dev = "png", dpi = 300, fig.width = 7, fig.height = 4}
+fig_no <- fig_no + 1
+# A small number of surfaces in D8 catchment were classed as 0.5 because their pits were often blocked.
+# These were classed as connected for modelling purposes
+ia$conn[ia$conn == 0.5] <- 1
+par(mar = c(0,0,0,0),mfrow = c(1,2))
+plot(cats$geometry[cats$sitecode %in% c("LIS0004H","LIS0001","LSN0001","LSS0001")])
+rect(par("usr")[1],par("usr")[3],par("usr")[2],par("usr")[4],col = gray(0.8),border = NA)
+plot(cats$geometry[cats$sitecode %in% c("LIS0004H","LIS0001","LSN0001","LSS0001")], add = TRUE)
+plot(ia$geometry[ia$pipeID < 100], border = NA, 
+     col = RColorBrewer::brewer.pal(3,"YlOrBr")[c(1,3)][match(ia$conn[ia$pipeID < 100],c(0,1))], add = TRUE)
+suppressWarnings(plot(sf::st_intersection(streams, subcs)$geometry, col = "darkblue", add = TRUE))
+title(main = "A. Little Stringybark Creek", adj = 0, line = -1, font.main = 1, cex.main = 0.8)
+
+plot(cats$geometry[grep("DBS",cats$sitecode)])
+rect(par("usr")[1],par("usr")[3],par("usr")[2],par("usr")[4],col = gray(0.8),border = NA)
+plot(cats$geometry[grep("DBS",cats$sitecode)], add = TRUE)
+plot(ia$geometry[ia$pipeID > 100], border = NA, 
+     col = RColorBrewer::brewer.pal(3,"YlOrBr")[c(1,3)][match(ia$conn[ia$pipeID < 100],c(0,1))], add = TRUE)
+suppressWarnings(plot(sf::st_intersection(streams, subcs)$geometry, col = "darkblue", add = TRUE))
+title(main = "B. Dobsons Creek", adj = 0, line = -1, font.main = 1, cex.main = 0.8)
+legend("bottomright", pch = 15, col = RColorBrewer::brewer.pal(3,"YlOrBr")[c(1,3)], legend = c(0,1), title = "Connected", cex = 0.8, bg = gray(0.8))
+```
+  
+#### Fig. S3-`r fig_no`. Maps of impervious areas of A. Little Stringybark Creek (LSC) and B. Dobsons Creek, coloured by drainage connection (see text).  
+
+### Table ia (impervious surfaces)  
+
+Impervious polygons (see S2 Appendix for determination) were split by parcel and by pipe subcatchment to permit parcel-wise and sub-catchment-wise estimation of imperviousness. Each resulting polygon was given a unique polygon identifier (polyID), a parcel identifier (address, matched to the parcels table) and a pipeID (matched to the subcs table).  The conn field denoted drainage connection, where conn = 1 for surfaces draining to sealed stormwater drainage, 0 for surfaces that are informally drained to land.  
+
+The field parcType indicates the type of parcel the surface lies in (property or road).  All surfaces in road parcels were paved, ground surfaces, while surfaces in property parcels could be either roof or paving.  For the LSC catchment, property surfaces were reliably classified as roof or ground paving (pave), and were classed as such in the surfType field.  In other catchments, the classification of roof and paving in properties was unreliable, and all property surfaces were classed as roof.
+
+The contructionDate field was empty for most surfaces, but the construction date was entered for any surfaces for which construction was evident in the time series of aerial imagery.  Dates were inferred to the nearest month based on the progress of construction visible in the photos.  The area of each surface was calculated in R using the package sf and recorded in the field area_m2.  
+
+### Table parcelChanges  
+
+For all impervious polygons in table ia that were constructed, demolished or connected to the drainage system during the study period, the date of change was recorded in the date field of parcelChanges together with "polyID" (matched to table ia), "pipeID" (matched to table subcs), "address" and "parcelID" (both matched to table parcels), and "changeType" (construction, demolition or connection).  The connection status ("conn"), surface type ("surfType":roof or pave), and any further details ("comment") were also noted.  
+
+### Table scmProjects  
+
+The `r dim(scmProjects)[1]` stormwater control projects in the two experimental catchments, identified by a unique "projectID", were discrete, identifiable projects on a single parcel (matched to table parcels by the field "address").  Each project consisted of one or more stormwater control measures (see table SCMs below) that may overflow independently to the drainage network, or be connected to each other in a treatment train. Most projects were constructed as part of a single project with an identifiable cost. The only exception were small kerb-cut raingarden projects that were commissioned by Yarra Ranges Council in groups, often across multiple road parcels. For these projects, stormwater control measures in each project were grouped by parcel into separate projectIDs and their cost estimated proportionally. (Cost data were removed from the dataset for this paper.) Several properties had more than one project constructed over the study period.  
+
+Each project was associated with a "round" with the following possible values:  
+
+- 'DBS existing SCMs' or 'E', existing stormwater control projects that were installed prior to the study in the D8 and L4 catchments, respectively;  
+
+- 'DBS tanks round 1', the first round of engagement in the Dobsons Creek project, funded by offering standardised stormwater treatment systems free of charge [@cheesman_etal_2016];  
+
+- 'DBS tanks round 2', the first round of engagement in the Dobsons Creek project, funded by a reverse single round, multi-unit, sealed bid, budget constrained, discriminatory price auction, with an undisclosed reserve price [@cheesman_etal_2016];
+
+- '1', the first round of engagement in the Little Stringybark Creek project funded by a reverse, sealed-bid uniform-price auction [@bos_brown_2015];  
+
+- '2', the second round of engagement in the Little Stringybark Creek project funded by a reverse, rising-clock, uniform-price auction [@bos_brown_2015];  
+
+- '3', the third round of engagement in the Little Stringybark Creek project funded by offering standardised stormwater treatment systems free of charge to properties in pipe subcatchments with no possibility of end-of-pipe SCMs, with maximum cost set by rounds 1 and 2 [@bos_brown_2015];  
+
+- '4', an extension of the third round of engagement in the Little Stringybark Creek project;  
+
+- 'D', demonstration projects conducted in the early stages of the Little Stringybark Creek project;  
+
+- 'N', projects implemented during the study period independent of the project;  
+
+- 'SO', projects implemented as a requirement of the environmental significance overlay on the Little Stringybark Creek catchment [@bos_brown_2015];  
+
+- 'DBS KCC raingardens', stormwater control measures installed by Knox City Council as part of the Dobsons Creek project;  
+
+- 'PN', small curb-cut stormwater control measures installed on public land by Yarra Ranges Council, funded by the same mechanism as round 3;  
+ 
+- 'PL', large stormwater control systems on public land, mostly installed and operated by Yarra Ranges Council (one on a school property), collecting runoff from all impervious surfaces upstream of their subcatchments (identified by pipeID).  
+
+The scmProject table lists each "projectID", "round", "installDate" (the date of installation), "pipeID" (matched to table subcs), and "parcelID" (matched to table parcels).  
+
+### Table SCMs  
+
+Each of the `r dim(SCMs)[1]` SCMs in the two experimental catchments is identified by a unique "scmID", and a "type" (one of 'dd', downpipe diverter; 'tank', rainwater tank; or 'rg', raingarden, in the broadest sense including infiltration systems, bioinfiltration systems, etc).  
+
+Each SCM also has a 'nextds', which takes the value of one of:  
+
+- NA (i.e. missing), indicating that the SCM overflows to the stormwater drainage system;  
+
+- land', indicating that the SCM overflows informally to pervious land, thereby fully rendering the impervious surfaces upstream non-effective;  
+
+- the "scmID" of another SCM to which the SCM overflows.  
+
+The SCMs table also lists the fields "round" (matched to table scmProjects), "dbName" (a meaningful descriptor for some SCMs), projectID (matched to table scmProjects), pipeID (matched to table subcs), and parcelID (matched to table parcels).  The three types of SCMs have different sets of specification parameters required to model their performance, thus requiring separate specifications tables (downpipe diverters, dds; tanks and raingardens).  
+
+### Table dds  
+
+`r sum(dds$ddNo)` downpipe diverters were installed on `r dim(dds)[1]` properties as part of the first round of engagement in the Dobsons Creek catchment.  Diverters were of a standard design: 500-mm length of 90-mm downpipe, with a volume of ~3.2 L, attached to a standard hose at a height of ~1 m, which drains to a garden.  The design conservatively aimed to minimize the risk of downpipe-blocking in intense rain events. As a result, most diverters resulted in very small degrees of retention (< 1 mm/d of rainfall retained if the roof area draining to the diverter exceeded 10 m^2^).  Diverters were not installed in any other rounds.  
+
+To model their performance, all diverters installed as part of a single project were given an "scmID".  For each set of diverters in a projectID, the dds table lists "scmID","projectID",the total catchment area draining to the diverters in m^2^ "ddCarea", and the number of diverters "ddNo". 
+
+### Table tanks  
+
+`r dim(tanks)[1] - sum(tanks$round %in% c("E","DBS existing SCMs"))` tanks were installed in the two experimental catchments during the study period, in addition to `r sum(tanks$round %in% c("E","DBS existing SCMs"))` existing tanks.  The tanks table lists the specifications required to model their performance (Table S3-1). 
+
+#### Table S3-1. Fields and definitions for the tanks table.  
+
+```{r tanksMetaData, echo=FALSE, message=FALSE, warning=FALSE, paged.print=FALSE}
+tanksMetaData <- metadata[metadata$tab == "tanks",c("field","definition")]
+names(tanksMetaData) <- c("Field","Definition")
+row.names(tanksMetaData) <- NULL
+table_for_word(tanksMetaData, pgwidth = 6.69)
+```
+ 
+### Table raingardens  
+
+`r dim(raingardens)[1]` raingardens were installed in the two experimental catchments during the study.  The raingardens table lists the specifications required to model their performance (Table S3-2).
+  
+
+#### Table S3-2. Fields and definitions for the raingardens table.  
+
+```{r rgsMetaData, echo=FALSE, message=FALSE, warning=FALSE, paged.print=FALSE}
+rgsMetaData <- metadata[metadata$tab == "raingardens",c("field","definition")]
+names(rgsMetaData) <- c("Field","Definition")
+row.names(rgsMetaData) <- NULL
+table_for_word(rgsMetaData, pgwidth = 6.69)
+```
+
+### Table scmChanges  
+
+The specifications of `r length(unique(scmChanges$scmID))` SCMs changed during the study, and those changes are listed in this table.  For each change the scmID and projectID are listed, together with the date of the change ("changeDate").  The parameter "param" (matching a field in the relevant table, dds, tanks or raingardens), is listed together with the value of the parameter after the change, "newValue".  
+
+### Table scmsDecommissioned  
+
+`r dim(scmsDecommissioned)[1]` SCMs were decommissioned during the study, in almost all cases to be replaced by an upgraded system as part of one of the engagement rounds.  These SCMS are listed in this table, with the date of decommissioning "decommDate", and any explanatory information in "comments".  
+
+### Table filtprofs  
+
+The filtprofs table lists profiles of hydraulic conductivity measured in 12 locations around the Little Stringybark Creek catchment (Fig. S3-`r fig_no + 1`) and the mean, default profiles used in estimating performance in raingardens in other locations in the LSC catchment and in the Dobsons Creek catchment.  For each profile (identified by "filtprofFile"), the profile to 1-m depth was split into strata (specified by the lowest depth of each stratum, "depth_m") of different hydraulic conductivity ("Ks_mm_h").  The table also has a porosity field, but this is not used in calculations, as the specification of filter medium in modelling raingardens is used to determine porosity.
+
+The substantial small-scale variability among the measured soil profiles made accurate prediction of soil hydraulic conductivity impossible. Following review of the variability among sites, a mean soil profile was developed as the default value for the Little Stringybark Creek catchment. This profile was used to model raingarden performance for all raingardens, except for those for which on-site measurements of hydraulic conductivity had been made (Fig. S3-`r fig_no + 1`).  The default used in this paper differed from earlier performance calculations [e.g. @fletcher_etal_2011], having a more gradual decline in hydraulic conductivity with depth than the original default, and a higher hydraulic conductivity at the maximum depth (0.1 mm/h vs 0.005 mm/h).  This resulted in increased estimated infiltration rates and filtered volume indices, although differences in the final estimates of performance and environmental benefit were small.  
+
+In the Dobsons Creek catchments, the mean filter profile from multiple hydraulic conductivity tests around the Wicks bioinfiltration system [@bonneau_etal_2020] were used for all raingardens.  
+
+```{r filtprof_map, echo=FALSE, warning = FALSE, message=FALSE, fig.width = 6,  fig.height = 8}
+fig_no <- fig_no + 1
+allProfiles <- unique(filtprofs$filtprofFile)
+allProfiles <- c(allProfiles[-grep("Bailey",allProfiles)],allProfiles[grep("Bailey",allProfiles)])
+profCols <- c(RColorBrewer::brewer.pal(8,"Paired")[-c(5)],rep(RColorBrewer::brewer.pal(9,"Set1")[9],5))
+rgSCMs <- SCMs[SCMs$type == "rg",]
+rgSCMs$filtr.prfile <- raingardens$filtr.prfile[match(rgSCMs$scmID,raingardens$scmID)]
+rgSCMs$profCol <- profCols[match(rgSCMs$filtr.prfile, allProfiles)]
+# rgSCMsMap <- LSCSCMsMap[as.vector(LSCSCMsMap$scmID) %in% rgSCMs$scmID,]
+# rgSCMsMap$profCol <- rgSCMs$profCol[match(as.vector(rgSCMsMap$scmID), rgSCMs$scmID)]
+lo <- layout(matrix(c(1,3:8,rep(2,7),15,9:14),3,7,byrow = TRUE),
+       heights = c(3,12,3), widths = c(1,rep(2.5,6)))
+#layout.show(lo)
+par(mar = c(0,0,0,0))
+plot.new()
+title(ylab = "Depth (m)", line = -2)
+plot(parcels$geometry[parcels$pipeID < 100], lty = 1, lwd = 1, border = gray(0.75))
+plot(subcs$geometry[subcs$pipeID < 100], lty = 2, lwd = 2, border = "darkgreen", add = TRUE)
+suppressWarnings(plot(sf::st_intersection(streams, subcs)$geometry, lty = 1, lwd = 2, col = "darkblue", add = TRUE))
+# plot(ia$geometry[ia$pipeID < 100], lty = 1, lwd = 1,
+#      border = c("#FFCC99","#660000")[match(ia$conn[ia$pipeID < 100],0:1)],
+#      col = c(alpha("#FFCC99",0.5), alpha("#660000",0.5))[match(ia$conn[ia$pipeID < 100],0:1)], add = TRUE)
+plot(rgSCMs$geometry, pch = 21, bg = rgSCMs$profCol, add = TRUE)
+par(mar = c(4,2,1,1))
+for(i in c(1:11,13)){  #leave out Bailey115mid2 to fit them all in the plot
+  filtprof <- filtprofs[filtprofs$filtprofFile == allProfiles[i],]
+plot(log10(c(filtprof$Ks_mm.h[1],filtprof$Ks_mm.h)), c(0,filtprof$depth_m), type = 's',lwd = 2,
+           xlim = c(-3,3),ylim = c(1.4,0),axes = FALSE, xlab = "",ylab = "", col = profCols[min(i,8)])
+points(-3,0,pch = 21, bg = profCols[min(i,8)])
+axis(1,at  = (-4):3)
+axis(2, at = seq(1.6,0,-0.2), las = 1)
+abline(v = 0, lty = 3)
+title(xlab = expression(paste(log[10],"(",K[su],"[mm/h])",sep = "")),col.main = profCols[min(i,8)])
+title(main = gsub("profile","",
+                  gsub(".filtprof","",gsub("filtprof.","",
+                       gsub(".rdata","",tolower(allProfiles[i]))))))
+}
+par(mar = c(0,0,0,0))
+plot.new()
+title(ylab = "Depth (m)", line = -2)
+```
+
+#### Fig. S3-`r fig_no`. The default mean profile of soil hydraulic conductivity used for most raingardens in the Little Stringybark catchment (mtev.default, light blue dots on map), and the measured profiles used for raingardens at the measurement sites (colours of points match the profile curves).
+
+### Hydrologic data used for SCM modelling  
+
+The Environmental Benefit Index (EB[^1]) standard calculation (to assess the cost per EB in selecting SCM projects) used a standard single (average) year of data from the nearby Croydon rain gauge (No. 086234, www.bom.gov.au), 1 April 1965 to 31 March 1966. The SCM model functions used by the EB calculator [https://tools.thewerg.unimelb.edu.au/EBcalc/, @fletcher_etal_2011] used two tables:  
+
+[^1]: The unitless stormwater stream impact index, *S*, described in the paper is equivalent to $(1 - EB)*100/CA$, where CA is the impervious catchment area of the SCM in m^2^. The EB index was scaled to 100m^2^ of impervious area for ease of communicating the value of SCM projects.  
+
+- a daily series of rainfall, imprevious runoff and potential evapotranspriation used for tank calculations; and  
+
+- a similarly structured hourly series.
+
+We made minor modifications to original model function code (tankmodel.R and gardenmodel.R) used by the EB calculator (now in the file "code/modelfunctions2017.R"), and have simplified the storage of the Croydon 1965-66 data. The hourly table is now saved in the Rdata file "Croydon_1966_hourly_rain_runoff_et.rda", and is compiled for EB calculations into a list containing an hourly and a daily time-series table, using the function "prepare_runoff_data()".
+
+We used the Croydon 1965-66 data to calculate series of EB and its variants.  To illustrate how change in EB over time corresponds to modelled change in water flows out of SCMs in S4 Appendix, we used an hourly series (2000-2019) of rainfall and evapotranspiration data for the L4 catchment (saved as "lsc_rain_hourly.rda").  The rainfall data were aggregated from 6-min-interval areal rainfall data across the catchment estimated for the study period at 6-min intervals using a combination of 6-min (or less) data from the Melbourne Water Mt Evelyn gauge (229690A: https://www.melbournewater.com.au/water/rainfall-and-river-levels#/), four gauges that we installed installed over different periods in the catchment), ), and the BoM daily rainfall grid (http://www.bom.gov.au/climate/how/newproducts/IDCdrgrids.shtml).  
+
+The BoM grid is computed using an optimised Barnes successive correction technique that applies a weighted averaging process to the station data, where each grid-point represents an approximately square area with sides of about 5 km (0.05°). Daily rainfall for each catchment was extracted from the nearest grid cell, and disaggregated using the temporal pattern of sub-daily rain gauge data from nearby gauges. The gridded daily totals were assumed to be a more accurate estimate of rainfall than daily totals from the nearest gauge. Daily gridded data with totals <0.2 mm were set to zero as they correspond to less than a single tip of a rain gauge.
+
+A composite 6-min time series was generated by selecting the best quality gauge data in a sequential order of preference, using successively more distant gauges to infill missing/unreliable data in the preceding dataset. The resultant 6-min composite gauge data was then used to disaggregate the daily totals of each catchment.  
+
+A different disaggregation approach was used depending on the available data. Each rainfall estimate was classified by the approach used as one of the following:  
+
+- zeroTotal: The gridded daily total = 0. Every record for the day was set to zero even if the gauge data total > 0.  
+
+- temporal: The gridded daily total > 0 and there were no missing values in the gauge data. The daily total was disaggregated using the temporal pattern of the gauge data.  
+
+- semiTemporal: The gridded daily total > 0 and there were missing values in the gauge data, but the total gauge data was >= 70% of the gridded daily total. The daily total is disaggregated using the temporal pattern of the gauge data.  
+
+- mid-point: The gridded daily total > 0 and a) there were missing values in the gauge data and the total gauge data was < 70% of the gridded daily total or b) gauge data = 0. The daily total was attributed to the mid-point of the rain day (i.e. 2100 h).  
+
+Mean potential evapotranspiration across the catchment was estimated for the study period at 6-min intervals using the daily Morton’s potential evapotranspiration (PET) grid from the Scientific Information for Land Owners (SILO) database of historical climate records for Australia (https://www.longpaddock.qld.gov.au/silo/index.html). The grid was of the same spatial resolution as the BoM grid, and the daily PET value was extracted from the nearest grid cell.
+Daily PET values were disaggregated to a 6-min interval using the temporal pattern of one-minute solar radiation data from BoM Station 086282 (Melbourne Airport: http://www.bom.gov.au/climate/data/oneminsolar/about-IDCJAC0022.shtml#service). The cosine of the sun’s zenith distance (i.e. the angular distance from directly overhead) was considered to be a good approximation for the distribution of ET throughout the day [@kumar_etal_2000].  
+
+## References  
+
+
+

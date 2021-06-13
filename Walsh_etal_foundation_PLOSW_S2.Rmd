@@ -1,0 +1,84 @@
+---
+title: 'Linking stormwater control performance to stream ecosystem outcomes: incorporating a performance metric into effective imperviousness'
+subtitle: 'S2 Appendix. Impervious surface mapping methods'
+author: 'Christopher J. Walsh, Matthew J. Burns, Tim D. Fletcher, Darren G. Bos, Peter Poelsma, Joshphar Kunapo and Sam J. Imberger'
+date: 'School of Ecosystem and Forest Sciences, The University of Melbourne, 500 Yarra Boulevard, Burnley Victoria 3121, Australia '
+output: 
+  word_document:
+    reference_docx: officedown_template.docx
+csl: plos.csl
+bibliography: references.bib
+---
+
+```{r load_data, include = FALSE}
+knitr::opts_chunk$set(echo = TRUE, dev = "pdf", message=FALSE) #,dpi = 200 
+```
+
+This document describes the methods for determination of impervious surfaces in the catchments of the experiment described in the paper.   
+
+### A. Semi-automated classification  
+
+We used  a rule-based expert classification routine [@kunapo_etal_2005] with spatial integration and aggregation to extract three classes of impervious surface (roofs, roads and paved surfaces) and two pervious classes (tree canopy and ground pervious surfaces: Fig. S2-1). Primary data sources were LiDAR point data and Infra-red imagery (both from Victorian Department of Sustainability and Environment 2008 Greater Melbourne LiDAR dataset, unpublished), waterbodies polygon layer [source], cadastre (https://discover.data.vic.gov.au/dataset/parcel-view-vicmap-property), road centreline data (https://discover.data.vic.gov.au/dataset/vicmap-transport-road-network), and planning-zone data (https://discover.data.vic.gov.au/dataset/planning-scheme-zones-vicmap-planning). We derived ground and non-ground polygons from the LiDAR, and used a normalised vegetation index (NDVI) model [@carlson_ripley_1997] to distinguish roofs and trees among the non-ground polygons, and to distinguish grass from non-grass ground polygons.  
+
+The non-grass ground polygons were further screened by excluding areas classed as waterbodies. To detect roads obscured by tree cover, we used the cadastre to derive road-reserve parcels.  Within road-reserve parcels, we augmented road polygons with a buffer of width determined by street type to road centre-lines. Driveway surfaces obscured by tree canopy were manually added by inspection of the aerial photos in areas with tree cover.  Polygons were Polygons were split on parcel boundaries (See S3 Appendix) and given parcel identifiers to permit parcel-wise estimates of impervious cover. We applied this method to the entire Melbourne Water area covering an area of 1,278 km^2^.  For this study, we report only on the areas within our study catchments.  
+
+
+```{r eval=FALSE, echo=FALSE, fig.width = 7, fig.height = 5}
+DiagrammeR::grViz("digraph rmarkdown{
+  graph [rankdir = TB]
+  node [fontname = Helvetica, fontsize = 36,shape = box]
+  tab1 [label = '@@1']
+  tab2 [label = '@@2']
+  tab3 [label = '@@3']
+  tab4 [label = '@@4']
+  tab5 [label = '@@5', color = 'red']
+  tab6 [label = '@@6']
+  tab7 [label = '@@7']
+  tab8 [label = '@@8']
+  tab9 [label = '@@9']
+  tab10 [label = '@@10']
+  tab11 [label = '@@11', color = 'red']
+  tab12 [label = '@@12', color = 'red']
+  
+  tab1 -> tab2 -> tab3;
+  tab4 -> tab5 -> tab6;
+  tab4 -> tab7 -> tab8;
+  tab2 -> tab5;
+  tab2 -> tab6;
+  tab3 -> tab7;
+  tab3 -> tab8;
+  tab8 -> tab9 -> tab10 -> tab11 
+  tab10 -> tab12;
+}
+  
+  [1]: paste0('1. LiDAR height model', '\\n ', '(non-ground minus ground data)')
+  [2]: paste0('1.1. Develop a non-ground', '\\n ', 'polygon layer for height >1.5 m')   
+  [3]: paste0('1.2. Develop a ground polygon layer', '\\n ', 'by removing non-ground polygons', '\\n ','from the study area polygons')      
+  [4]: paste0('2. NDVI model', '\\n ', '([infrared - red]/[infrared + red]) * 100')
+  [5]: paste0('2.1. Roofs: select NDVI ', '\u2264 20', '\\n ', 'within non-ground polygon.', '\\n ', 'Perform QA and finalise roofs layer')   
+  [6]: paste0('2.2. Trees: Remove roofs from ', '\\n ', 'non-ground polygons to form', '\\n ','a tree layer')      
+  [7]: paste0('2.3 Grass: select NDVI >20', '\\n ', 'within ground polygon')
+  [8]: paste0('2.4. Other: remove grass from ground', '\u2264 20', '\\n ', 'polygons to form other areas.', '\\n ', '(paving, bare soils, unsealed roads, water)') 
+  [9]: paste0('3.1. Use waterbodies polygon layer to', '\\n ', 'remove waterbodies from other')
+  [10]: paste0('3.2. Use cadastre to split all', '\\n ', 'ground polygons into road and property parcels')
+  [11]: paste0('3.3. Use road type classes from', '\\n ', 'centreline data to separate unsealed', '\\n ', 'roads in road polygons to form roads layer')
+  [12]: paste0('3.4. Use planning scheme zone data', '\\n ', 'to identify properties likely to have', '\\n ', 'paved ground surfaces, remove bare soil', '\\n ', 'from other to form paved impervious layer')
+  ")
+```
+```{r, include=TRUE, echo=FALSE, fig.width = 6.75, fig.height = 5}
+#flow chart generated in above chunk in Rstudio, and printed to pdf.
+knitr::include_graphics("images/imp_determination_flow_diag.pdf")
+```
+
+#### Fig. S2-1. Process flow diagram for semi-automated determination of polygon layers for the three classes of impervious surface (red boxes).    
+
+### B.	Manual validation and correction  
+
+We used the semi-automated data as a base dataset to derive a final corrected impervious dataset.  We used the series of nearmap.com aerial images from 2009 to 2017 (www.nearmap.com) to manually correct boundaries and classification (roof or paved, the latter being a combination of road and ‘other’ in the semi-automated data) of impervious polygons in every property and road parcel of L4, D8 (and their nested subcatchments), Ly, Sa, and a 70-ha portion of the more densely developed Br. Using multiple images permitted better discrimination of surfaces in treed areas that were obscured in some images but not others, in addition to deriving construction dates of recent surfaces. 
+
+For other catchments, Google street view was used to check and correct all road and driveway surfaces, but property surfaces were not checked. Major omissions and misclassifications in Fe and Ol were corrected, but paved surfaces on properties were not corrected.  For areas that were not completely corrected, correction factors were applied to imperviousness estimates based on similar checked areas (see the code below).  
+
+The available time series of images (2000, 2004, and nearmap imagery from 2009 to 2017 at 1-6 mo intervals) were used to estimate dates of constructions or demolitions of impervious surfaces were noted for relevant polygons in all parcels in L4, D4, D8, Ly, Sa, and portions of Fe, Ol, and Br.  These data were used to construct time-series of growth in impervious area in the first 5 catchments, and similar time series were estimated for the last 3 by applying growth rates of areas of similar development to the 2009 estimates of impervious area in the areas that had not been systematically checked at the parcel level. The code in 'load_ld_scms_tables.R' builds a data frame of TI and EI time series for each of the eleven study catchments, from construction date data in the parcelChanges table in the SCMs database (see S3) for the 6 experimental catchments (L1, Ln, Ls, L4, D4 and D8), and from a combination of construction date data in the catIA table and application of growth factors.
+
+The code in 'load_ld_scms_tables.R' (sourced in compiling this document) records the process used to compile TI and EI time series for eleven catchments into a data.frame called `ei_ts`. Note that the catIA table that is used to compile time series for the reference and control catchments is not part of the database described in S3 Appendix.  
+
