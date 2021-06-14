@@ -2,7 +2,7 @@
 
 The RMarkdown documents with names like `walsh_etal_foundation_PLOSW_S1.Rmd` are the source code of the supplementary materials (S1-S5) of the paper, and `walsh_etal_foundation_PLOSW_figs_tab.Rmd` is the source of the paper's figures and table.  
 
-The large data files used by this repository are stored in the Open Science Framework (OSF) repository [https://osf.io/57azq/](https://osf.io/57azq/).  Assuming you are working in a clone of this github repository, the script `load_ld_scms_tables.R` downloads the data from the OSF repository. (This file is sourced, and the data downloaded, if you run or knit either Rmd file.)  
+The large data files used by this repository are stored in the Open Science Framework (OSF) repository [https://osf.io/57azq/](https://osf.io/57azq/).  Assuming you are working in a clone of this github repository, the script `load_ld_scms_tables.R` downloads the data from the OSF repository. (This file is sourced, and the data downloaded, if you run or knit most of the Rmd files.)  
 
 The data were originally stored as a postgreSQL database, with this structure. 
 
