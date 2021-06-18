@@ -1149,13 +1149,32 @@ budget_scm_on_datex <- function(scmID,
             names(hourlybudgets)[which(allusi == nohrly[k])] <- nohrly[k]
           }
           }
-        if(!"RPLT542" %in% flow_to_rg){
-          adflow <-  apply(sapply(hourlybudgets[flow_to_rg], '[[', "overflow"),1,FUN = sum) +
-                      apply(sapply(hourlybudgets[flow_to_rg], '[[', "out"),1,FUN = sum)
-          #Except at Morrisons Reserve where the leak from RPLT542 flows down a swale, not to RG
-        }else{
-          adflow <-  apply(sapply(hourlybudgets[flow_to_rg], '[[', "overflow"),1,FUN = sum)
+        if(length(flow_to_rg) > 0){
+          over_and_out_to_rg <- over_only_to_rg <- vector()
+          for(i in 1:length(flow_to_rg)){
+            if(flow_to_rg[i] %in% c(dds$scmID, raingardens$scmID)){
+              over_and_out_to_rg <- c(over_and_out_to_rg, flow_to_rg[i])
+            }else{
+              tanki <- tanks[tanks$scmID == flow_to_rg[i],]
+              if(grepl("stormwater",tanki$leakTo) & tanki$overTo != "stormwater"){
+                over_only_to_rg <- c(over_only_to_rg, flow_to_rg[i])
+              }else{
+                over_and_out_to_rg <- c(over_and_out_to_rg, flow_to_rg[i])
+              }
+            }
           }
+          if(length(over_and_out_to_rg) == 0){
+            adflow <-  apply(sapply(hourlybudgets[flow_to_rg], '[[', "overflow"),1,FUN = sum)
+          }else{
+            if(length(over_and_out_to_rg) > 0){
+              adflow <-  apply(sapply(hourlybudgets[flow_to_rg], '[[', "overflow"),1,FUN = sum) +
+                apply(sapply(hourlybudgets[over_and_out_to_rg], '[[', "out"),1,FUN = sum)
+            }else{
+              adflow <-  apply(sapply(hourlybudgets[flow_to_rg], '[[', "overflow"),1,FUN = sum) +
+                apply(sapply(hourlybudgets[flow_to_rg], '[[', "out"),1,FUN = sum)
+            }
+          }
+        }
       }
       rb <- calcRGBudget(rgj,
                          runoffData = runoffData,
