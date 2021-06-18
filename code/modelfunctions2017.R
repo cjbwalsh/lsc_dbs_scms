@@ -124,13 +124,13 @@ tankmodel <- function(runoff,
   annual.outdoor <- sum(daily.outdoor)/(1000 * nyears)
 
   # Calculate internal water usage
-  toilet <- npeople * toilet
-  hotwater <- npeople * hotwater
+  toilet <- npeople * toilet / timestep_multiplier
+  hotwater <- npeople * hotwater / timestep_multiplier
 
   if(npeople < 1) {
     wmac <- 0
   } else {
-    wmac <- wmac1 + (npeople - 1) * wmacadd
+    wmac <- wmac1 + (npeople - 1) * wmacadd / timestep_multiplier
   }
 
   # Create usage combinations matrix
