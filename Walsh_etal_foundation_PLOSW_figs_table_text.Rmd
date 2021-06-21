@@ -79,8 +79,7 @@ petrol_tank_specs <- tanks[grep("Petrol",tanks$projectID), ]
 petrol_term_tank <- "RPLT537"
 #The petrol station has its own pipeID - no other impervious surfaces.
 petrol_pipeID <- scmProjects$pipeID[grepl("Petrol",scmProjects$projectID)]
-petrol_budget <- budget_scm_on_datex(petrol_term_tank,
-                                     data_on_datex(petrol_pipeID,"2018-01-01"))
+petrol_budget <- budget_scm_on_datex(petrol_term_tank,"2018-01-01")
 # Note the above budget includes the leak from RPLT536, as the budget considers
 # fate of all water falling upstream of the scm - but it is only being used to 
 # calculate the total usage, which was all drawn from RPLT537
