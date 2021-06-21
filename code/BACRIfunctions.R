@@ -334,9 +334,9 @@ scmMap <- function(pipeID, addLegend = TRUE,addSCMNetwork = TRUE, ZoomToSCMs = F
 #' # db29 <- data_on_datex(29, "2018-01-01")
 
 data_on_datex <- function(pipeID, datex){
-  #1. Change subc network structure if King St or the Entrance were operational and relevant.
+  #1. Change subc network structure if King St Upper or the Entrance were operational and relevant.
   subcsx <- subcs; kingst <- theentrance <- FALSE
-  if(pipeID %in% unique(c(alldownstream(subcs, 30, "pipeID"),alldownstream(subcs, 31, "pipeID"))) & 
+  if(pipeID %in% unique(c(alldownstream(subcs, 30, "pipeID"),alldownstream(subcs, 31, "pipeID"),75)) & 
      (datex >= "2016-07-15" & datex < "2016-10-14") | #commissioning to first taking offline
      (datex >= "2017-03-17" & datex < "2017-09-15") | #First erosion problems fixed
      (datex >= "2018-02-05" & datex < "2019-06-02")){ #Second erosion problems addressed
@@ -750,7 +750,7 @@ calcTankBudget <- function(tanki,
   #hourly_budget is NA
   if(grepl("stormwater",tanki$leakTo)){
     hourly_budget <- data.table::data.table(data.frame(date = runoffData$hourly$date,
-                                      inflow = runoffData$hourly$runoff_mm,
+                                      inflow = runoffData$hourly$runoff_mm*tanki$tankCarea,
                                       use = tankiMod$flows$use[,useIndex],
                                       leak = tankiMod$flows$leak[,useIndex],
                                       overflow = tankiMod$flows$overflow[,useIndex],
@@ -958,13 +958,13 @@ calcDDBudget <- function(ddi,
 #'     the leak_fates table.
 #' @examples
 #' # # load tables from lsc_dbs_scms database, including all required tables
-#' # load("data/lscdbsSCMs_db.rda")
+#' # source(here("load_ld_scms_tables.R"))
 #' # SCMs <- scms; rm(scms)
 #' # budget_scm_on_datex("RPLR527", "2018-02-04")
-#' #   # Hereford Rd RB:  EBc 59.8/119.1,  ~2 s  
+#' #   # Hereford Rd RB:  imp_carea 11771
 #' #  Note 4 identical tanks upstream of this system
 #' # budget_scm_on_datex("D4T105", "2018-02-04")
-#' #   # a not great tank: EBc 0.30/0.98,  < 1 s
+#' #   # a not great tank: imp_carea 98
 
 budget_scm_on_datex <- function(scmID, 
                                 datex,
@@ -1020,11 +1020,11 @@ budget_scm_on_datex <- function(scmID,
   gardenarea <- ifelse(scmID %in% raingardenstab$scmID,
                        raingardenstab$Af[raingardenstab$scmID == scmID],0)
   carea <- sum(ddstab$ddCarea,tankstab$tankCarea,raingardenstab$impCarea) 
-  v_start <- (sum(tankstab$tankvol) + 
-                sum(0.5*raingardenstab$Hf*raingardenstab$Af*1000))/2
   dailybudgets <- list()
   hourlybudgets <- list()
-  leak_fates <- data.frame(scmID = allusi, et = 0, exf = 0)
+  leak_fates <- data.frame(scmID = allusi, et = 0, exf = 0,stringsAsFactors = FALSE)
+  start_stores <- data.frame(scmID = allusi, store = NA, stringsAsFactors = FALSE)
+  end_stores <- data.frame(scmID = allusi, store = NA, stringsAsFactors = FALSE)
   for(j in 1:length(allusi)){
     if(db_datex$SCMs$type[db_datex$SCMs$scmID == allusi[j]] == "tank"){
       tankj <- tankstab[tankstab$scmID == allusi[j],]
@@ -1091,10 +1091,15 @@ budget_scm_on_datex <- function(scmID,
                                  additional.inflow = adflow)
       dailybudgets[[j]] <- tankjMod$daily_budget
       names(dailybudgets)[j] <- allusi[j]
+      start_stores$store[start_stores$scmID == tankj$scmID] <- tankj$tankBegin
       if (grepl("stormwater",tankj$leakTo)){
         hourlybudgets[[j]] <- tankjMod$hourly_budget
         names(hourlybudgets)[j] <- allusi[j]
+        end_stores$store[end_stores$scmID == tankj$scmID] <- 
+          tankjMod$hourly_budget$store[dim(tankjMod$hourly_budget)[1]]
         }else{
+          end_stores$store[end_stores$scmID == tankj$scmID] <- 
+            tankjMod$daily_budget$store[dim(tankjMod$daily_budget)[1]]
           hourlybudgets[[j]] <- data.table(date = runoffData$hourly$datetime,
                                            inflow = 0,
                                            use = 0,
@@ -1156,7 +1161,8 @@ budget_scm_on_datex <- function(scmID,
               over_and_out_to_rg <- c(over_and_out_to_rg, flow_to_rg[i])
             }else{
               tanki <- tanks[tanks$scmID == flow_to_rg[i],]
-              if(grepl("stormwater",tanki$leakTo) & tanki$overTo != "stormwater"){
+              if((grepl("stormwater",tanki$leakTo) & tanki$overTo != "stormwater") |
+                 !(grepl("stormwater",tanki$leakTo))){
                 over_only_to_rg <- c(over_only_to_rg, flow_to_rg[i])
               }else{
                 over_and_out_to_rg <- c(over_and_out_to_rg, flow_to_rg[i])
@@ -1190,11 +1196,16 @@ budget_scm_on_datex <- function(scmID,
       dailybudgets[[j]] <- rb$dailyBudget
       hourlybudgets[[j]] <- rb$hourlyBudget
       names(dailybudgets)[j] <- names(hourlybudgets)[j] <- allusi[j]
-    }
+      start_stores$store[start_stores$scmID == rgj$scmID] <- rgj$Vstart
+      end_stores$store[end_stores$scmID == rgj$scmID] <- 
+        rb$hourlyBudget$store[length(rb$hourlyBudget$store)]
+  }
     if(db_datex$SCMs$type[db_datex$SCMs$scmID == allusi[j]] == "dd"){
       dailybudgets[[j]] <- calcDDBudget(ddstab[ddstab$scmID == allusi[j],],
                                         runoffData = runoffData)
       names(dailybudgets)[j] <- allusi[j]
+      start_stores$store[start_stores$scmID == allusi[j]] <- 0
+      end_stores$store[end_stores$scmID == allusi[j]] <- 0
     }
   }
     if(db_datex$SCMs$type[db_datex$SCMs$scmID == scmID] == "rg"){
@@ -1203,6 +1214,8 @@ budget_scm_on_datex <- function(scmID,
   }else{
     hourly_budget <- NA
   }
+  #The very rare case of a tank overflowing to a tank, but leaking to stormwater
+  # (Petrol station is one such case)
   if(db_datex$SCMs$type[db_datex$SCMs$scmID == scmID] == "tank"){
       if(grepl("stormwater",tankstab$leakTo[tankstab$scmID == allusi[j]]) & scmID != allusi[j]){
        hourly_budget <- hourlybudgets[[scmID]]
@@ -1247,28 +1260,20 @@ budget_scm_on_datex <- function(scmID,
   budget$exf <- apply(sapply(dailybudgets, '[[', "exf"),1,  FUN = sum)
   budget$store <- apply(sapply(dailybudgets, '[[', "store"),1,  FUN = sum)
   budget$void <- apply(sapply(dailybudgets, '[[', "void"),1,  FUN = sum)
-  budget$out <- apply(sapply(dailybudgets, '[[', "out"),1,  FUN = sum)
+ # out not summed, because other than odd exceptions (see above) out flows do 
+ # not drain to terminal systems
   }else{
     budget$use <- sum(sapply(dailybudgets, '[[', "use"))
     budget$et <- sum(sapply(dailybudgets, '[[', "et"))
     budget$exf <- sum(sapply(dailybudgets, '[[', "exf"))
     budget$store <- sum(sapply(dailybudgets, '[[', "store"))
     budget$void <- sum(sapply(dailybudgets, '[[', "void"))
-    budget$out <- sum(sapply(dailybudgets, '[[', "out"))
   }
   #taking the treatment train as a whole, the inflow to the system equals...
   budget$inflow <- runoffData$daily$runoff_mm*carea  #dailybudgets[[scmID]]$inflow
-  end_stores <- data.frame(scmID = names(dailybudgets)[1],
-                           store = tail(dailybudgets[[1]]$store,1),
-                           stringsAsFactors = FALSE)
-  if(length(dailybudgets) > 1){
-for(i in 2:length(dailybudgets))
-  end_stores <- rbind(end_stores,  data.frame(scmID = names(dailybudgets)[i],
-                                              store = tail(dailybudgets[[i]]$store,1),
-                                              stringsAsFactors = FALSE))
-  }
   list(budget = budget, hourly_budget = hourly_budget, imp_carea = carea,
-       leak_fates = leak_fates, v_start = v_start, end_stores = end_stores)
+       leak_fates = leak_fates, start_stores = start_stores,
+       end_stores = end_stores)
 }
 
 # EB_scm_on_datex() ---------------------------------
@@ -1306,26 +1311,29 @@ for(i in 2:length(dailybudgets))
 #' # load("data/lscdbsSCMs_db.rda")
 #' # t(unlist(EB_scm_on_datex("RPLJ001", "2018-02-05")))
 #' #   #Fernhill Rd Jellyfish after King St Upper diversion: 
-#' #   # EB 60.5 (out of max potential of 110.6), ~30 s
-#' # t(unlist(EB_scm_on_datex("RPLJ001", db = "2018-02-04")))
+#' #   # EB 69.6 (out of max potential of 110.6), ~30 s
+#' #  raingardens$medium[grep("J",raingardens$scmID)] <- "gravel (scoria)"
+#'   t(unlist(EB_scm_on_datex("RPLR558", "2018-02-05")))
+#' #  King St Upper raingarden after diversion # 47.1 / 136.7
+#' # t(unlist(EB_scm_on_datex("RPLJ001", "2018-02-04")))
 #' #   #Fernhill Rd Jellyfish before King St Upper diversion: 
-#' #   # EB 138.2 / 247.3, ~90 s (many upstream tanks with leaks to stormwater)
-#' # t(unlist(EB_scm_on_datex("D4D004", db = "2018-02-04")))
+#' #   # EB 152.5 / 247.3, ~90 s (many upstream tanks with leaks to stormwater)
+#' # t(unlist(EB_scm_on_datex("D4D004", "2018-02-04")))
 #' #   # Not very effective downpipe diverter: EB 0.04 / 0.53, <1 s
-#' # t(unlist(EB_scm_on_datex("D4T105", db = "2018-02-04")))
-#' #   # a not great tank: EBc 0.22 / 0.98,  < 1 s
-#' # t(unlist(EB_scm_on_datex("RPLR527", db = "2018-02-04")))
-#' #   # Hereford Rd RB:  EB 59.5 / 117.7  ~2 s  
+#' # t(unlist(EB_scm_on_datex("D4T105", "2018-02-04")))
+#' #   # a not great tank: EBc 0.23 / 0.98,  < 1 s
+#' # t(unlist(EB_scm_on_datex("RPLR527", "2018-02-04")))
+#' #   # Hereford Rd RB:  EB 73.0 / 117.7  ~2 s  
 
 EB_scm_on_datex <- function(scmID, 
                             datex,
                             runoffData = Croydon,
-                           R_n = 12, #Number of days of runoff in the pre-urban state
-                           Nconc_n = 0.6, Pconc_n = 0.05, TSSconc_n = 20, #Target contaminant concentrations 
-                           percentile = 50, #percentile used for assessing concentrations against n and u
-                           max_filter_flow_rate = 0.3,  #L/h/m2 of total imp catchment area should be ~0.1: see gardenmodel in modelfunctions2017.R
-                           reward.overextraction = TRUE, #Over-extraction from any one SCM rewarded if overall, volume reduction is well below target
-                           override.FV_n = FALSE #Excess filtered volume acceptable if overall, FV is well below target
+                            R_n = 12, #Number of days of runoff in the pre-urban state
+                            Nconc_n = 0.6, Pconc_n = 0.05, TSSconc_n = 20, #Target contaminant concentrations 
+                            percentile = 50, #percentile used for assessing concentrations against n and u
+                            max_filter_flow_rate = 0.3,  #L/h/m2 of total imp catchment area should be ~0.1: see gardenmodel in modelfunctions2017.R
+                            reward.overextraction = TRUE, #Over-extraction from any one SCM rewarded if overall, volume reduction is well below target
+                            override.FV_n = FALSE #Excess filtered volume acceptable if overall, FV is well below target
                             ) {
      pipeID <- SCMs$pipeID[SCMs$scmID == scmID]
      db_datex <- data_on_datex(pipeID, datex)
@@ -1399,10 +1407,10 @@ EB_scm_on_datex <- function(scmID,
     # beginning, ignore this difference i.e. if system is emptier at end of run
     # than at start, then don't include the difference as lost (i.e. used and 
     # fallen during the period) water
-    delstore <- max(0, x$v_start - sum(x$end_stores$store)) #x$budget$store[dim(x$budget)[1]])
+    delstore <- sum(x$start_stores$store) - sum(x$end_stores$store) #x$budget$store[dim(x$budget)[1]])
     #tank/rg start volume = store[1] + use[1] + exf[1] + et[1]
-    V_m <- sum(c(x$budget$out,x$budget$overflow,x$budget$exf)) + 
-               sum(x$leak_fates$exf) - delstore  #sum(totLostVol)
+   V_m <- sum(c(x$budget$out,x$budget$overflow,x$budget$exf)) + 
+               sum(x$leak_fates$exf) + delstore  #sum(totLostVol)
     V_u <- sum(Rmtab$V_ui)
     V_n <- x$imp_carea * Zhang.forest.ro * mean.annrain.mm
     VR <- (1 - max((V_m - V_n)/(V_u - V_n), 0)) * x$imp_carea/100
@@ -1533,6 +1541,12 @@ EB_scm_on_datex <- function(scmID,
                           (TSSconc_u - TSSconc_n))) * x$imp_carea/100))
   # arguably these urban values (2.2, 0.35 and 150) are the more appropriate conc for 75th %ile
   # this index can potentially score < 1 (if N is added to the system)
+  
+  # # potential rounding error in VR 
+EB_max <- x$imp_carea/100
+  # if(VR < 0 & abs(VR) < EB_max*0.0005) VR <- 0
+  #If any more negative, potential error....
+  
  summary <- list("R_m" = R_m,"R_n" = R_n,"R_u" = R_u,"R_mb" = R_mb,
                  "V_m" = V_m,"V_n" = V_n,"V_u" = V_u,
                  "F_m" = F_m,"F_forest" = F_forest,"F_pasture" = F_pasture,"F_u" = 0,
@@ -1542,7 +1556,7 @@ EB_scm_on_datex <- function(scmID,
                  "RO" = RO,"RO_binary" = RO_binary,"VR" = VR,"FV" = FV,"WQ" = WQ, 
                  "EB" = mean(c(RO,VR,FV,WQ)),
                  "EB_old_calc" = mean(c(RO_binary,VR,FV,WQ)),
-                 "EB_max" = x$imp_carea/100)
+                 "EB_max" = EB_max)
  return(summary)
 }
 
