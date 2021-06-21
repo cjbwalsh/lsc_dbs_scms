@@ -8,7 +8,7 @@
 # and enter TAB to move to the Project directory name field. Click Create Project.
 
 # Walsh, C. J., Burns, M. J., Fletcher, T. D., Bos, D. G., Kunapo, J., Poelsma, P., & Imberger, S. J. (2021), 
-# Linking stormwater control performance to stream ecosystem outcomes: incorporating performance metrics into 
+# Linking stormwater control performance to stream ecosystem outcomes: incorporating a performance metric into 
 # effective imperviousness/Data and code, Open Science Framework. https://osf.io/57azq
 
 source("code/BACRIfunctions.R")
