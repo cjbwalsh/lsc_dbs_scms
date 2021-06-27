@@ -12,7 +12,7 @@ modfunctions <- ifelse(grepl("lsc_dbs_scms", getwd()),
                        "../lsc_foundation/code/modelfunctions2017.R")
 source(modfunctions)
 
-
+# Function for formatting tables when knitting to word from RMarkdown
 table_for_word <- function(input_table, font = "Helvetica", pgwidth = 6.69){  
 ft <- flextable::regulartable(input_table)
 ft <- flextable::align(ft, align = "left", part = "all")
@@ -83,15 +83,6 @@ if(db %in% c("lsc")){
   # return the result
   return(rs)
 }
-
-#disconnect connections if too many    
-# drv <- DBI::dbDriver("PostgreSQL")
-# dbDisconnect(RPostgreSQL::dbListConnections(drv)[[1]])
-# dbDisconnectAll <- function(){
-#   ile <- length(dbListConnections(MySQL())  )
-#   lapply( dbListConnections(MySQL()), function(x) dbDisconnect(x) )
-#   cat(sprintf("%s connection(s) closed.\n", ile))
-# }
 
 # prepare_runoff_data() ---------------------------------  
 #' Prepare an R object containing rainfall, impervious runoff and evapotranspiration
@@ -943,19 +934,19 @@ calcDDBudget <- function(ddi,
 #'     *Note that, if there are upstream SCMs, the hourly budget are only valid 
 #'     for outflows from the SCM ("out", "overflow", "Nconcout","Pconcout", and
 #'     "TSSout"). Upstream losses are not summed (but they are for daily budgets)
-#' @details See WalshEtAl_LSCfoundation_figsTabs.Rmd for details on EB parameters
-#'     and https://urbanstreams.net/lsc/EBcalctech.html for information on water
-#'     quality parameters not considered in the foundation paper. 
-#'     
+#' @details See Walsh et al. 2021 "Linking stormwater control performance to
+#'      stream ecosystem outcomes: incorporating a performance metric into 
+#'      effective imperviousness" for descriptions of EB paramaters (expressed 
+#'      in the paper as S, which equals 1 - EB/max(EB)).
 #'     Budgets need to be collated for all SCMs upstream, that contribute to the
 #'     inflow to this SCM. Budgets of the focus SCM and all upstream SCMs are 
 #'     collated into two lists (dailybudgets and hourlybudgets).  Daily budgets 
 #'     (quicker to calculate) suffice for estimates of losses (et and use), but 
-#'     flows to downstream systems (out, overflow) need to be calculated on an hourly 
-#'     onto gardens is uncertain. We estimate it on an annual timestep using the 
-#'     timestep.  The fate of water leaking from tanks Zhang (2001) curve, and save 
-#'     estimated total exf and et from leaks over the  full period of analysis into 
-#'     the leak_fates table.
+#'     flows to downstream systems (out, overflow) need to be calculated on an 
+#'     hourly timestep.  The fate of water leaking from tanks onto gardens is 
+#'     uncertain. We estimate it on an annual timestep using the Zhang (2001) 
+#'     curve, and save estimated total exf and et from leaks over the  full 
+#'     period of analysis into the leak_fates table.
 #' @examples
 #' # # load tables from lsc_dbs_scms database, including all required tables
 #' # source(here("load_ld_scms_tables.R"))
@@ -1008,6 +999,7 @@ budget_scm_on_datex <- function(scmID,
     }
   }
   allusi <- allupstream(db_datex$SCMs, scmID, "scmID")
+#  all_nextus <- db_datex$SCMs$scmID[db_datex$SCMs$nextds == scmID]
   nus <- vector()
   for(i in 1:length(allusi)){
     nus <- c(nus, length(allupstream(db_datex$SCMs, allusi[i], "scmID")))
@@ -1026,6 +1018,7 @@ budget_scm_on_datex <- function(scmID,
   start_stores <- data.frame(scmID = allusi, store = NA, stringsAsFactors = FALSE)
   end_stores <- data.frame(scmID = allusi, store = NA, stringsAsFactors = FALSE)
   for(j in 1:length(allusi)){
+      hourly_budget <- NA
     if(db_datex$SCMs$type[db_datex$SCMs$scmID == allusi[j]] == "tank"){
       tankj <- tankstab[tankstab$scmID == allusi[j],]
       if(nus[j] == 1){ 
@@ -1037,7 +1030,6 @@ budget_scm_on_datex <- function(scmID,
           #Only those tanks that leak to stormwater will have been calculated at an hourly timestep
           #Those that were only calculated at a daily timestep are listed in nohrly.
           #Distributing overflow for these tanks should suffice, because any tanks with 'out' flows
-          #Or if not specs_for_EB, we need the 
           if(length(nohrly) > 0){
             for(k in 1:length(nohrly)){
               allus_flow_to_tankk <- allupstream(db_datex$SCMs, nohrly[k], "scmID")
@@ -1116,7 +1108,7 @@ budget_scm_on_datex <- function(scmID,
     if(tankj$leak.rate > 0 & tankj$soil.area.receiving.leak > 0){
       eETexf <- Zhang64ExfET(tanki = tankj,
                              tankBudget = dailybudgets[[j]],
-                             mrm = sum(runoffData$daily$runoff_mm))
+                             mrm = sum(runoffData$daily$rain_mm))
       leak_fates$exf[j] <- eETexf$exf
       leak_fates$et[j] <- eETexf$ET
     }
@@ -1212,27 +1204,26 @@ budget_scm_on_datex <- function(scmID,
        hourly_budget <- hourlybudgets[[scmID]]
        hourly_budget$inflow <- runoffData$hourly$runoff_mm*carea
   }else{
-    hourly_budget <- NA
-  }
   #The very rare case of a tank overflowing to a tank, but leaking to stormwater
   # (Petrol station is one such case)
-  if(db_datex$SCMs$type[db_datex$SCMs$scmID == scmID] == "tank"){
-      if(grepl("stormwater",tankstab$leakTo[tankstab$scmID == allusi[j]]) & scmID != allusi[j]){
+  if(db_datex$SCMs$type[db_datex$SCMs$scmID == scmID] == "tank" & length(allusi) > 1){
+    allusi_non_scmID <- allusi[allusi != scmID]
+    for(k in 1:length(allusi_non_scmID)){
+      tankk <- tankstab[tankstab$scmID == allusi_non_scmID[k],]
+    if(grepl("stormwater",tankk$leakTo)){
        hourly_budget <- hourlybudgets[[scmID]]
        hourly_budget$inflow <- runoffData$hourly$runoff_mm*carea
        if(length(hourlybudgets) > 1){
-         allusi_non_scmID <- allusi[allusi != scmID]
-         for(k in 1:length(allusi_non_scmID)){
            if(!is.null(dim(hourlybudgets[[allusi_non_scmID[k]]]))){
            hourly_budget$use <- hourly_budget$use + hourlybudgets[[allusi_non_scmID[k]]]$use
            hourly_budget$out <- hourly_budget$out + hourlybudgets[[allusi_non_scmID[k]]]$out
-           }
-           }
-       }
-  }else{
-    hourly_budget <- NA
+         }
+         dailybudgets[[scmID]]$out <- aggregate(hourly_budget$out, by = list(date = hourly_budget$date), FUN = sum)$x
   }
-  }
+    }
+    }
+  }  
+    }
     #Hourly budgets for all if calculations are not just for EB
     if(!specs_for_EB & length(hourly_budget) == 1){
       totCarea <- carea
@@ -1299,13 +1290,17 @@ budget_scm_on_datex <- function(scmID,
 #' @return A list the sub-indices RO, RO_binary, VR, FV, and WQ; their 
 #'       component variables R, R(b), V, F and Nconc, Pconc, and TSSconc from
 #'       the SCM (_m), in the pre-urban state (_n), and from impervious surfaces 
-#'       (_u); the primary EB index used in the foundation paper, the EB_old_calc
-#'       index (used by the EB calculator, and in the LSC project development,
-#'       calculated using R_mb instead of R_m), and the maximum EB index value
-#'       that could have been achieved by this SCM.
-#' @details See WalshEtAl_LSCfoundation_figsTabs.Rmd for details on EB variables
-#'     and https://urbanstreams.net/lsc/EBcalctech.html for information on water
-#'     quality parameters not considered in the foundation paper
+#'       (_u); the primary EB index (used to calculate S---1-EB/max(EB)]--- by 
+#'       Walsh et al. (2021 "Linking stormwater control performance to
+#'       stream ecosystem outcomes: incorporating a performance metric into 
+#'       effective imperviousness"), the EB_old_calc index (used by the EB 
+#'       calculator, and in the LSC project development, calculated using R_mb 
+#'       instead of R_m), and the maximum EB index value that could have been 
+#'       achieved by this SCM.
+#' @details See Walsh et al. 2021 "Linking stormwater control performance to
+#'      stream ecosystem outcomes: incorporating a performance metric into 
+#'      effective imperviousness" for descriptions of EB paramaters (expressed 
+#'      in the paper as S, which equals 1 - EB/max(EB)).
 #' @examples
 #' # # load tables from lsc_dbs_scms database, including all required tables
 #' # load("data/lscdbsSCMs_db.rda")
@@ -1342,12 +1337,15 @@ EB_scm_on_datex <- function(scmID,
       if(scmID %in% db_datex$tanks$scmID){
          scm_stats <- db_datex$tanks[db_datex$tanks$scmID == scmID,]
          gardenarea <- scm_stats$gardenArea
-         }
+         max_filter_flow_rate.L.h <- (x$imp_carea + 
+                                        ifelse(grepl("stormwater", scm_stats$leakTo), 0,  gardenarea)) * max_filter_flow_rate
+      }
       if(scmID %in% db_datex$dds$scmID){
-         scm_stats <- db_datex$tanks[db_datex$dds$scmID == scmID,]
+         scm_stats <- db_datex$dds[db_datex$dds$scmID == scmID,]
          gardenarea <- 10  #see Walsh and Fletcher 2014 for uncertainty (and irrelevance) around this
-    }
-       max_filter_flow_rate.L.h <- (x$imp_carea + gardenarea) * max_filter_flow_rate
+         max_filter_flow_rate.L.h <- (x$imp_carea + 50) * max_filter_flow_rate
+         #for downpipe diverters, doesn't really matter because they are standard estimates, but this will be typical
+      }
        Rmtab <- data.table::data.table(
               data.frame(V_ui = runoffData$daily$runoff_mm*x$imp_carea,
                         out = x$budget$out,
@@ -1403,15 +1401,18 @@ EB_scm_on_datex <- function(scmID,
     mean.annrain.mm <- sum(runoffData$daily$rain_mm)
     Zhang.forest.ro <- 1 - (1 + 2820/mean.annrain.mm)/(1 + 2820/mean.annrain.mm + mean.annrain.mm/1410)
     Zhang.pasture.ro <- 1 - (1 + 550/mean.annrain.mm)/(1 + 550/mean.annrain.mm + mean.annrain.mm/1100)
-    # if there is more in the SCMs at the end than in the 
-    # beginning, ignore this difference i.e. if system is emptier at end of run
+    # if there is less in the SCMs at the end than in the beginning, 
+    # ignore this difference i.e. if system is fuller at end of run
     # than at start, then don't include the difference as lost (i.e. used and 
-    # fallen during the period) water
-    delstore <- sum(x$start_stores$store) - sum(x$end_stores$store) #x$budget$store[dim(x$budget)[1]])
+    # fallen during the period) water. If it is emptier and the difference is 
+    # greater than the runoff from the SCM, then don't adjust for the difference
+    delstore <- max(0, max(0, sum(x$start_stores$store) - sum(x$end_stores$store)))
+    delstore <- ifelse(delstore > sum(c(x$budget$out,x$budget$overflow,x$budget$exf)) + 
+                         sum(x$leak_fates$exf),0,delstore)
     #tank/rg start volume = store[1] + use[1] + exf[1] + et[1]
-   V_m <- sum(c(x$budget$out,x$budget$overflow,x$budget$exf)) + 
-               sum(x$leak_fates$exf) + delstore  #sum(totLostVol)
-    V_u <- sum(Rmtab$V_ui)
+    V_m <- sum(c(x$budget$out,x$budget$overflow,x$budget$exf)) + 
+               sum(x$leak_fates$exf) - delstore  #sum(totLostVol)
+    V_u <- sum(Rmtab$V_ui) 
     V_n <- x$imp_carea * Zhang.forest.ro * mean.annrain.mm
     VR <- (1 - max((V_m - V_n)/(V_u - V_n), 0)) * x$imp_carea/100
     if(reward.overextraction) {
@@ -1543,8 +1544,8 @@ EB_scm_on_datex <- function(scmID,
   # this index can potentially score < 1 (if N is added to the system)
   
   # # potential rounding error in VR 
-EB_max <- x$imp_carea/100
-  # if(VR < 0 & abs(VR) < EB_max*0.0005) VR <- 0
+  EB_max <- x$imp_carea/100
+  if(VR < 0 & abs(VR) < EB_max*0.0005) VR <- 0
   #If any more negative, potential error....
   
  summary <- list("R_m" = R_m,"R_n" = R_n,"R_u" = R_u,"R_mb" = R_mb,
@@ -1583,9 +1584,10 @@ EB_max <- x$imp_carea/100
 #'     of each SCM are weighted by its Runoff frequency EB index), V_u, runoff
 #'     from all IA in the subc, V_m, runoff from all IA in the subc accounting 
 #'     for SCM retention, F_m, runoff filtered by SCMs in the subc.
-#' @details See WalshEtAl_LSCfoundation_figsTabs.Rmd for details on EB variables
-#'     and https://urbanstreams.net/lsc/EBcalctech.html for information on water
-#'     quality parameters not considered in the foundation paper
+#' @details See Walsh et al. 2021 "Linking stormwater control performance to
+#'      stream ecosystem outcomes: incorporating a performance metric into 
+#'      effective imperviousness" for descriptions of EB paramaters (expressed 
+#'      in the paper as S, which equals 1 - EB/max(EB)).
 #' @examples
 #' # # load tables from lsc_dbs_scms database, including all required tables
 #' # load("data/lscdbsSCMs_db.rda")
@@ -1670,9 +1672,10 @@ EB_subc_on_datex <- function(pipeID, datex,
 #' @return A data.frame with fields scmID, date, and all of the output statistics
 #'    from EB_scm_on_datex. Each row records the EB statistics for the day after
 #'    a recorded change in the dataset
-#' @details See WalshEtAl_LSCfoundation_figsTabs.Rmd for details on EB variables
-#'     and https://urbanstreams.net/lsc/EBcalctech.html for information on water
-#'     quality parameters not considered in the foundation paper
+#' @details See Walsh et al. 2021 "Linking stormwater control performance to
+#'      stream ecosystem outcomes: incorporating a performance metric into 
+#'      effective imperviousness" for descriptions of EB paramaters (expressed 
+#'      in the paper as S, which equals 1 - EB/max(EB)).
 #' @examples
 #' # # load tables from lsc_dbs_scms database, including all required tables
 #' # load("data/lscdbsSCMs_db.rda")
@@ -1767,9 +1770,10 @@ EB_scm_time_series <- function(scmID, start_date, fin_date, runoffData = Croydon
 #'    non_term_dates: scmIDs that were terminal SCMs for part but not all of the
 #'    time series, with the date at which they stopped being terminal in the field
 #'    date.
-#' @details See WalshEtAl_LSCfoundation_figsTabs.Rmd for details on EB variables
-#'     and https://urbanstreams.net/lsc/EBcalctech.html for information on water
-#'     quality parameters not considered in the foundation paper
+#' @details See Walsh et al. 2021 "Linking stormwater control performance to
+#'      stream ecosystem outcomes: incorporating a performance metric into 
+#'      effective imperviousness" for descriptions of EB paramaters (expressed 
+#'      in the paper as S, which equals 1 - EB/max(EB)).
 #' @examples
 # system.time(ei_29 <- EI_subc_time_series(29)) #~8 s
 # system.time(ei_53 <- EI_subc_time_series(53)) #~31 min
@@ -1878,9 +1882,10 @@ if(length(non_term_dates$date[j]) != sum(scmsDecommissioned$scmID == non_term_da
 #' @return A list of two data.tables, budget (daily time-step) and hourly_budget
 #'    (if the SCM is a raingarden or a tank with a leak to stormwater), each with 
 #'    fields date, inflow, use, out, exf, et, overflow, store and void.
-#' @details See WalshEtAl_LSCfoundation_figsTabs.Rmd for details on EB variables
-#'     and https://urbanstreams.net/lsc/EBcalctech.html for information on water
-#'     quality parameters not considered in the foundation paper
+#' @details See Walsh et al. 2021 "Linking stormwater control performance to
+#'      stream ecosystem outcomes: incorporating a performance metric into 
+#'      effective imperviousness" for descriptions of EB paramaters (expressed 
+#'      in the paper as S, which equals 1 - EB/max(EB)).
 #' @examples
 #' # # load tables from lsc_dbs_scms database, including all required tables
 #' # load("data/lscdbsSCMs_db.rda")
@@ -1988,9 +1993,10 @@ budget_scm_time_series <- function(scmID, runoffData){
 #'    non_term_dates: scmIDs that were terminal SCMs for part but not all of the
 #'    time series, with the date at which they stopped being terminal in the field
 #'    date.
-#' @details See WalshEtAl_LSCfoundation_figsTabs.Rmd for details on EB variables
-#'     and https://urbanstreams.net/lsc/EBcalctech.html for information on water
-#'     quality parameters not considered in the foundation paper
+#' @details See Walsh et al. 2021 "Linking stormwater control performance to
+#'      stream ecosystem outcomes: incorporating a performance metric into 
+#'      effective imperviousness" for descriptions of EB paramaters (expressed 
+#'      in the paper as S, which equals 1 - EB/max(EB)).
 #' @examples
 #' # system.time(budget_29 <- budget_subc_time_series(pipeID = 29,
 #' #                                             runoffData = lsc_runoff)) #~1.5 min
@@ -2145,6 +2151,9 @@ plotlEItrends <- function(pipeiTrend, legend = FALSE, ylab = TRUE, xlab = TRUE, 
                       expression(EI[SV]),expression(EI[SW]),expression(EI[S0])))
   }
 }
+
+# ct() ---------------------------------
+#' Comparable to spread in tidyverse
 
 ct <- function (rows, cols, values = NULL, FUN = sum, convertNAToZero = TRUE,...) 
 {
