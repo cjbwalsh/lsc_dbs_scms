@@ -58,6 +58,9 @@ for (i in 1:length(rda_files)) {
 # The following files (loaded above) are derived from the database tables using code in the Rmd files
 # ei_ts.rda - see derivation in ei_ts chunk of WalshEtAl_wrr2021_S1-2.Rmd
 
+#Trial of correcting likely mistake...
+tanks$leak.at.propn.of.capacity[tanks$leak.at.propn.of.capacity > 0.5] <- 1 - tanks$leak.at.propn.of.capacity[tanks$leak.at.propn.of.capacity > 0.5]
+
 #Tidy up some of the data ready for analysis and plotting
 SCMs <- scms; rm(scms)
 #add Little Stringybark and Dobsons impervious data to other catchments
@@ -113,13 +116,13 @@ load("data/final_stats.rda")
 #' Calculate time series of EI variants for the 6 experimental catchments
 #' Indicative calculation times (total for all 6 catchments ~ ~2 h) based
 #' on running on a computer with a 3.3 GHz processor, using Linux OS (Ubuntu 18.4)
-# system.time(ei_74 <- EI_subc_time_series(74))   #~2 min (pipeID 74 = L1)
-# system.time(ei_53 <- EI_subc_time_series(53))   #~11 min (pipeID 53 = Ln)
-# system.time(ei_36 <- EI_subc_time_series(36))   #~22 min (pipeID 36 = Ls)
-# system.time(ei_101 <- EI_subc_time_series(101)) #~12 min (pipeID 101 = D4)
-# system.time(ei_71 <- EI_subc_time_series(71))   #~38 min (pipeID 71 = L4)
-# system.time(ei_103 <- EI_subc_time_series(103)) #21 min (pipeID 103 = D8)
-# save(ei_53,ei_36,ei_74,ei_101,ei_71,ei_103, file = "data/ei_ts.rda", compress = "xz")
+system.time(ei_74 <- EI_subc_time_series(74))   #~2 min (pipeID 74 = L1)
+system.time(ei_53 <- EI_subc_time_series(53))   #~11 min (pipeID 53 = Ln)
+system.time(ei_36 <- EI_subc_time_series(36))   #~18 min (pipeID 36 = Ls)
+system.time(ei_101 <- EI_subc_time_series(101)) #~26 min (pipeID 101 = D4)
+system.time(ei_71 <- EI_subc_time_series(71))   #~38 min (pipeID 71 = L4)
+system.time(ei_103 <- EI_subc_time_series(103)) #40 min (pipeID 103 = D8)
+save(ei_53,ei_36,ei_74,ei_101,ei_71,ei_103, file = "data/ei_ts.rda", compress = "xz")
 load(here::here("data","/ei_ts.rda"))
 
 ei_ts_all <- rbind(
