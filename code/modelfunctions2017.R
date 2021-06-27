@@ -65,7 +65,9 @@ lose.init <- function(x, initloss.mm = 1, ante.t = 1){
 # firstflush    first flush bypass volume in L)
 # npeople       number of people in house
 # toilet        average toilet usage per person per day in L
-# other         
+# other         any other uses for water from the tank, expressed as a string 
+#               that can be converted to a vector of length 12, with the 
+#               volume of uses in each calendar month (Jan-Dec) in L/month
 # wmac1         average washing machine use per day in L for 1 person
 # wmacadd       washing machine use for each additional person
 # hotwater      average daily hot water use per person in L
@@ -89,7 +91,7 @@ tankmodel <- function(runoff,
                       firstflush = carea * 0.2,
                       npeople = 2,
                       toilet = 18.9,
-                      other = rep(0, 12),
+                      other = rep(0, 12), #unit = L/month
                       wmac1 = 35.31,
                       wmacadd = 23.54,
                       hotwater = 46.9,
@@ -116,12 +118,12 @@ tankmodel <- function(runoff,
   nyears <- round(ndays/(365.25), 0)
 
   # Create the daily outdoor and other water demand datasets
-  # Each is a vector of water use for each day
-  daily.outdoor <- outdoor.dist[rep(match(month(runoff$date), 1:12))] * outdoor.annual * garden.area * 12/(36500*timestep_multiplier)
-  daily.other <- other[match(month(runoff$date), 1:12)]/(30.4*timestep_multiplier)
+  # Each is a vector of water use for each day (so for outdoor and other monthly estimates divide by approx no. days per month)
+  timestep.outdoor <- outdoor.dist[rep(match(month(runoff$date), 1:12))] * outdoor.annual * garden.area * 12/(30.4*36500*timestep_multiplier)
+  timestep.other <- other[match(month(runoff$date), 1:12)]/(30.4*timestep_multiplier)
 
   # Annual outdoor demand
-  annual.outdoor <- sum(daily.outdoor)/(1000 * nyears)
+  annual.outdoor <- sum(timestep.outdoor)/(1000 * nyears)
 
   # Calculate internal water usage
   toilet <- npeople * toilet / timestep_multiplier
@@ -144,7 +146,7 @@ tankmodel <- function(runoff,
   # Create labels using use combinations vector
   labels <- c("garden", "other", "toilet", "laundry", "hot water")
   # Create matrix of daily demand for each use for all days
-  usage <- data.frame(cbind(garden=daily.outdoor, other=daily.other, 
+  usage <- data.frame(cbind(garden=timestep.outdoor, other=timestep.other, 
                             rep(toilet, ndays * timestep_multiplier), 
                             rep(wmac, ndays * timestep_multiplier), 
                             rep(hotwater, ndays * timestep_multiplier)))
