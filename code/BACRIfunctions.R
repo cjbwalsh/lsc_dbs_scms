@@ -1019,7 +1019,7 @@ budget_scm_on_datex <- function(scmID,
   start_stores <- data.frame(scmID = allusi, store = NA, stringsAsFactors = FALSE)
   end_stores <- data.frame(scmID = allusi, store = NA, stringsAsFactors = FALSE)
   for(j in 1:length(allusi)){
-      hourly_budget <- NA
+     hourly_budget <- NA
     if(db_datex$SCMs$type[db_datex$SCMs$scmID == allusi[j]] == "tank"){
       tankj <- tankstab[tankstab$scmID == allusi[j],]
       if(nus[j] == 1){ 
@@ -1188,6 +1188,7 @@ budget_scm_on_datex <- function(scmID,
       rb$hourlyBudget <- rb$hourlyBudget[, ..cols]
       dailybudgets[[j]] <- rb$dailyBudget
       hourlybudgets[[j]] <- rb$hourlyBudget
+      leak_fates$exf[[j]] <- sum(rb$hourlyBudget$exf)
       names(dailybudgets)[j] <- names(hourlybudgets)[j] <- allusi[j]
       start_stores$store[start_stores$scmID == rgj$scmID] <- rgj$Vstart
       end_stores$store[end_stores$scmID == rgj$scmID] <- 
