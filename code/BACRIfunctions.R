@@ -625,8 +625,9 @@ ia_ts <- function(pipeID,
   db <- data_on_datex(pipeID, start_date) 
   ia_ts <- data.table::data.table(date = seq.Date(start_date, fin_date, by = "days"),
                       carea = sum(db$subcs$scarea), 
-                      tia = sum(db$ia$area_m2), 
-                      eia = sum(db$ia$area_m2*db$ia$conn))
+                      tia = sum(db$parcels$roofAreaCon + db$parcels$paveAreaCon + 
+                                      db$parcels$roofAreaUncon + db$parcels$paveAreaUncon), 
+                      eia = sum(db$parcels$roofAreaCon + db$parcels$paveAreaCon))
   if(length(change_dates) > 0){
   for(i in 1:length(change_dates)) {
     db <- data_on_datex(pipeID, lubridate::ymd(change_dates[i] + days(1))) 
@@ -1367,10 +1368,10 @@ EB_scm_on_datex <- function(scmID,
                         out = x$hourly_budget$out,
                         over = x$hourly_budget$overflow))
     Rmtab$too_much_out <- Rmtab$out
-    Rmtab$too_much_out[Rmtab$out <= max_filter_flow_rate.L.h] <- 0
+    Rmtab$too_much_out[Rmtab$out <= max_filter_flow_rate.L.h & Rmtab$over == 0] <- 0
     Rmtab <- Rmtab[, lapply(.SD, sum, na.rm=TRUE), by=date, .SDcols=c("V_ui","out","over","too_much_out") ]
     #FVm filtered volume through the SCMs via out
-    F_m_out <- sum(Rmtab$out[Rmtab$out <= max_filter_flow_rate.L.h])
+    F_m_out <- sum(Rmtab$out - Rmtab$too_much_out)
   }
     ### It is possible in treatment trains for overflow to continue into the next day because of routing delay
     ### This will be in the first hour of the next day. To avoid infinite Rm value, move any such delayed overflows
@@ -1410,8 +1411,8 @@ EB_scm_on_datex <- function(scmID,
     delstore <- ifelse(delstore > sum(c(x$budget$out,x$budget$overflow,x$budget$exf)) + 
                          sum(x$leak_fates$exf),0,delstore)
     #tank/rg start volume = store[1] + use[1] + exf[1] + et[1]
-    V_m <- sum(c(x$budget$out,x$budget$overflow,x$budget$exf)) + 
-               sum(x$leak_fates$exf) - delstore  #sum(totLostVol)
+    V_m <- sum(c(x$budget$out,x$budget$overflow,x$budget$exf)) - 
+               sum(x$leak_fates$et) - delstore  #sum(totLostVol)
     V_u <- sum(Rmtab$V_ui) 
     V_n <- x$imp_carea * Zhang.forest.ro * mean.annrain.mm
     VR <- (1 - max((V_m - V_n)/(V_u - V_n), 0)) * x$imp_carea/100
@@ -1427,7 +1428,7 @@ EB_scm_on_datex <- function(scmID,
       #                  upstream exf + 
       #                  upstream out that is less than max_filter_flow_rate (F_m_out, calculated above)
       # (all compiled in budget_scm_on_datex())
-      F_m <- sum(x$leak_fates$exf) + F_m_out + sum(x$budget$exf) #x$budget$exf[1]
+      F_m <-  F_m_out + sum(x$budget$exf) - sum(x$leak_fates$et)
       # impervious runoff minus runoff from mature forest according to Zhang curve.
       F_pasture <- Zhang.pasture.ro * (x$imp_carea + gardenarea) * mean.annrain.mm
       F_forest <- Zhang.forest.ro * (x$imp_carea + gardenarea) * mean.annrain.mm
@@ -1611,8 +1612,9 @@ EB_subc_on_datex <- function(pipeID, datex,
   db <- data_on_datex(pipeID, datex)
   carea <- db$subcs$carea[db$subcs$pipeID == pipeID]
   terminal_scms <- db$SCMs[is.na(db$SCMs$nextds) | db$SCMs$nextds == "land",]
-  tia <- sum(db$ia$area_m2)
-  eia <- sum(db$ia$area_m2*db$ia$conn)  # connected IA ignoring SCMs
+  tia <- sum(db$parcels$roofAreaCon + db$parcels$paveAreaCon + 
+               db$parcels$roofAreaUncon + db$parcels$paveAreaUncon)
+  eia <- sum(db$parcels$roofAreaCon + db$parcels$paveAreaCon)  # connected IA ignoring SCMs
   if(dim(terminal_scms)[1] > 0){
     if(terminal_scms$pipeID[1] == pipeID){
       dbi <- db
@@ -1621,7 +1623,6 @@ EB_subc_on_datex <- function(pipeID, datex,
     }
   x <- data.frame(scmID = terminal_scms$scmID[1], 
              t(unlist(EB_scm_on_datex(terminal_scms$scmID[1], datex, runoffData))))  #, ...
-  }
   if(dim(terminal_scms)[1] > 1){
     for(i in 2:dim(terminal_scms)[1]){
       if(terminal_scms$pipeID[i] == pipeID){
@@ -1632,6 +1633,7 @@ EB_subc_on_datex <- function(pipeID, datex,
       x <- rbind(x,
                    data.frame(scmID = terminal_scms$scmID[i], 
                       t(unlist(EB_scm_on_datex(terminal_scms$scmID[i], datex, runoffData)))))  #, ...
+    }
   }
   eia_scms <- sum(x$EB_max)*100         #IA draining to an SCM
   eia_s <- eia - eia_scms               #all ia NOT draining to an SCM, W = 1
@@ -1641,7 +1643,7 @@ EB_subc_on_datex <- function(pipeID, datex,
    # given the broader challenge in finding enough demand
   eia_sFV <- eia_s + sum(x$EB_max*(1- x$FV/x$EB_max))*100 # ia draining to an SCM, W = FV
   eia_sEB <- eia_s + sum(x$EB_max*(1- x$EB/x$EB_max))*100 # ia draining to an SCM, W = EB
-  }else{
+   }else{
     eia_s <- eia_sRO <- eia_sVR <- eia_sFV <- eia_sEB <- eia
   }
   TI <- tia/carea
@@ -1794,7 +1796,7 @@ EI_subc_time_series <- function(pipeID,
   idates <- idates[idates < fin_date & idates >= start_date]
   non_term_dates <- data.frame(scmID = NA, date = lubridate::ymd("2000-01-01"), 
                                stringsAsFactors = FALSE)
-  if(length(idates) == 0) idates <- start_date
+  idates <- c(start_date, idates) #if(length(idates) == 0)
   for(i in 1:length(idates)){
     db <- data_on_datex(pipeID, idates[i] + days(1))
     if(i == 1){
