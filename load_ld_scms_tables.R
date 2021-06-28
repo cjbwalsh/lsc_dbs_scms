@@ -58,9 +58,6 @@ for (i in 1:length(rda_files)) {
 # The following files (loaded above) are derived from the database tables using code in the Rmd files
 # ei_ts.rda - see derivation in ei_ts chunk of WalshEtAl_wrr2021_S1-2.Rmd
 
-#Trial of correcting likely mistake...
-tanks$leak.at.propn.of.capacity[tanks$leak.at.propn.of.capacity > 0.5] <- 1 - tanks$leak.at.propn.of.capacity[tanks$leak.at.propn.of.capacity > 0.5]
-
 #Tidy up some of the data ready for analysis and plotting
 SCMs <- scms; rm(scms)
 #add Little Stringybark and Dobsons impervious data to other catchments
