@@ -1,8 +1,5 @@
 source(here::here("load_ld_scms_tables.R"))
 
-#Trial of correcting likely mistake...
-tanks$leak.at.propn.of.capacity[tanks$leak.at.propn.of.capacity > 0.5] <- 1 - tanks$leak.at.propn.of.capacity[tanks$leak.at.propn.of.capacity > 0.5]
-
 scmProjects$term_scm_1 <- NA
 scmProjects$n_term_scms <- NA
 for (i in 1:dim(scmProjects)[1]){
@@ -49,38 +46,6 @@ scmProjects_EB$perc_parcel_treated[scmProjects_EB$parcel_ia == 0] <- NA
 # very little effect on results.
 
 scmProjects_EB$perc_runoff_lost <- 100*(scmProjects_EB$V_u - scmProjects_EB$V_m)/scmProjects_EB$V_u
-sum(scmProjects_EB$perc_runoff_lost < 0)
-#Check this one problem...
-scmProjects_EB[scmProjects_EB$perc_runoff_lost < 0,]
-# Definitely a rounding error: very very small number.  That's ok
-
-sum(scmProjects_EB$V_m < 0)
-#zero - thank goodness
-
-head(scmProjects_EB[order(scmProjects_EB$S),],15)
-head(scmProjects_EB[order(scmProjects_EB$S, decreasing = TRUE),],25)
-
-temp <- scmProjects_EB[!grepl("Ex",scmProjects_EB$projectID),]
-temp <- temp[!grepl("RN-",temp$projectID),]
-temp <- temp[!grepl("RE-",temp$projectID),]
-head(temp[order(temp$S, decreasing = TRUE),],25)
-
-temp_dbs <- temp[grep("DBS",temp$round),]
-head(temp_dbs[order(temp_dbs$S, decreasing = TRUE),],25)
-temp_lsc <- temp[-grep("DBS",temp$round),]
-head(temp_lsc[order(temp_lsc$S, decreasing = TRUE),],25)
-
-with(temp_lsc[temp_lsc$round %in% 1:4,],sum(VR/EB_max > 0.5)/sum(temp_lsc$round %in% 1:4))
-with(temp_lsc[temp_lsc$round %in% 1:4,], hist(perc_runoff_lost))
-
-with(temp_lsc[temp_lsc$round %in% 1:4,],sum(perc_runoff_lost > 0.550345 * 100)/sum(temp_lsc$round %in% 1:4))  #27% (67 properties)
-sum(temp_lsc$EB_max[temp_lsc$round %in% 1:4 & temp_lsc$perc_runoff_lost > 0.550345 * 100])/100 #1.5 ha
-with(temp_dbs[temp_dbs$round %in% c("DBS tanks round 1","DBS tank round 2"),], 
-     sum(perc_runoff_lost > 0.550345 * 100)/sum(temp_dbs$round %in% c("DBS tanks round 1","DBS tank round 2"))) #16% (34 properties)
-sum(temp_dbs$EB_max[temp_dbs$round %in% c("DBS tanks round 1","DBS tank round 2") & temp_dbs$perc_runoff_lost > 0.550345 * 100])/100 
-  #0.5 ha
-#Proportion of private property treatments which achieved target runoff reduction (band in Fig. 3)
 
 save(scmProjects_EB, file = "data/scmProjects_EB.rda", compress = "xz")
-
 

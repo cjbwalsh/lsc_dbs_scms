@@ -326,7 +326,7 @@ scmMap <- function(pipeID, addLegend = TRUE,addSCMNetwork = TRUE, ZoomToSCMs = F
 
 data_on_datex <- function(pipeID, datex){
   #1. Change subc network structure if King St Upper or the Entrance were operational and relevant.
-  subcsx <- subcs; kingst <- theentrance <- FALSE
+    subcsx <- subcs; kingst <- theentrance <- FALSE
   if(pipeID %in% unique(c(alldownstream(subcs, 30, "pipeID"),alldownstream(subcs, 31, "pipeID"),75)) & 
      (datex >= "2016-07-15" & datex < "2016-10-14") | #commissioning to first taking offline
      (datex >= "2017-03-17" & datex < "2017-09-15") | #First erosion problems fixed
@@ -348,14 +348,37 @@ data_on_datex <- function(pipeID, datex){
   #3. restrict ia to those subcs and correct for parcelChanges before datex
   iax <- ia[ia$pipeID %in% subcsx$pipeID & (is.na(ia$constructionDate) | 
               ia$constructionDate < datex),]
+  iax_post <- ia[ia$pipeID %in% subcsx$pipeID & !is.na(ia$constructionDate) & 
+                                                    ia$constructionDate >= datex,]
+  if(dim(iax_post)[1] > 0){
+  for(i in 1:dim(iax_post)[1]){
+    if(is.na(iax_post$surfType[i]) | iax_post$surfType[i] == "roof"){
+      parcelsx$roofAreaCon[parcelsx$parcelID == iax_post$parcelID[i]] <- 
+        max(0, parcelsx$roofAreaCon[parcelsx$parcelID == iax_post$parcelID[i]] - 
+              iax_post$area_m2[i]*iax_post$conn[i])
+      if(iax_post$conn[i] == 0)
+      parcelsx$roofAreaUncon[parcelsx$parcelID == iax_post$parcelID[i]] <- 
+        max(0, parcelsx$roofAreaUnCon[parcelsx$parcelID == iax_post$parcelID[i]] - 
+              iax_post$area_m2[i])
+    }else{
+      parcelsx$paveAreaCon[parcelsx$parcelID == iax_post$parcelID[i]] <- 
+        max(0, parcelsx$paveAreaCon[parcelsx$parcelID == iax_post$parcelID[i]] - 
+              iax_post$area_m2[i]*iax_post$conn[i])
+      if(iax_post$conn[i] == 0)
+        parcelsx$paveAreaUncon[parcelsx$parcelID == iax_post$parcelID[i]] <- 
+          max(0, parcelsx$paveAreaUncon[parcelsx$parcelID == iax_post$parcelID[i]] - 
+                iax_post$area_m2[i])
+      }
+    }
+  }
   pcx <- parcelChanges[parcelChanges$pipeID %in% subcsx$pipeID & 
                          parcelChanges$date < datex,]
    ## For LSC, all but two constructions are noted both as construction date in the ia table and as 
    ## an identified polyID in the parcelChanges table.  Thus any such entries in parcelChanges can
    ## be removed. (The other two have polyID NA)
      ## remove ia demolished before datex
-  pcx <- pcx[is.na(pcx$polyID) | pcx$pipeID > 100,]
-  pcx_constructions <- pcx[pcx$changeType == "construction",]
+#  pcx <- pcx[is.na(pcx$polyID) | pcx$pipeID > 100,]
+  pcx_constructions <- pcx[pcx$changeType == "construction" & (is.na(pcx$polyID) | pcx$pipeID > 100),]
   if(dim(pcx_constructions)[1] > 0){
     #add any constructions assigned to parcelID rather than polyID 
     #as a circular polygon in the centre of the parcel
@@ -374,16 +397,85 @@ data_on_datex <- function(pipeID, datex){
       polyi <- polyi[c("polyID","pipeID","conn","nextds","area_m2",
                        "parcType","surfType","constructionDate","parcelID")] #see above if... #,"geometry")]
       iax <- rbind(iax[names(iax) != "subc"], polyi)
+      if(polyi$parcType == "property"){
+      parcelsx$roofAreaCon[parcelsx$parcelID == polyi$parcelID] <- 
+        min(parcelsx$parcelArea[parcelsx$parcelID == polyi$parcelID], 
+            parcelsx$roofAreaCon[parcelsx$parcelID == polyi$parcelID] + 
+        polyi$conn * polyi$area_m2)
+      if(polyi$conn == 0)
+        parcelsx$roofAreaUncon[parcelsx$parcelID == polyi$parcelID] <- 
+          min(parcelsx$parcelArea[parcelsx$parcelID == polyi$parcelID], 
+              parcelsx$roofAreaUnCon[parcelsx$parcelID == polyi$parcelID] + 
+          polyi$area_m2)
+      }else{
+        parcelsx$paveAreaCon[parcelsx$parcelID == polyi$parcelID] <- 
+          min(parcelsx$parcelArea[parcelsx$parcelID == polyi$parcelID], 
+              parcelsx$paveAreaCon[parcelsx$parcelID == polyi$parcelID] + 
+                polyi$conn * polyi$area_m2)
+        if(polyi$conn == 0)
+          parcelsx$paveAreaUncon[parcelsx$parcelID == polyi$parcelID] <- 
+            min(parcelsx$parcelArea[parcelsx$parcelID == polyi$parcelID], 
+                parcelsx$paveAreaUnCon[parcelsx$parcelID == polyi$parcelID] + 
+                  polyi$area_m2)
+      }
     }
     }
   pcx_demolitions <- pcx[pcx$changeType == "demolition",]
-  if(dim(pcx_demolitions)[1] > 0)
+  if(dim(pcx_demolitions)[1] > 0){
     iax <- iax[!iax$polyID %in% pcx_demolitions$polyID,]
-   ## connect ia that was connected before datex
-  pcx_connections <- pcx[pcx$changeType == "connection",]
-  if(dim(pcx_connections)[1] > 0)
+    for(i in 1:dim(pcx_demolitions)[1]){
+      if(is.na(pcx_demolitions$surfType[i]) | pcx_demolitions$surfType[i] == "roof"){
+        parcelsx$roofAreaCon[parcelsx$parcelID == pcx_demolitions$parcelID[i]] <- 
+          max(0, parcelsx$roofAreaCon[parcelsx$parcelID == pcx_demolitions$parcelID[i]] - 
+                pcx_demolitions$conn[i] * pcx_demolitions$area_m2[i])
+        if(pcx_demolitions$conn[i] == 0)
+          parcelsx$roofAreaUncon[parcelsx$parcelID == pcx_demolitions$parcelID[i]] <- 
+            max(0, parcelsx$roofAreaUnCon[parcelsx$parcelID == pcx_demolitions$parcelID[i]] - 
+                  pcx_demolitions$area_m2[i])
+      }else{
+        parcelsx$paveAreaCon[parcelsx$parcelID == pcx_demolitions$parcelID[i]] <- 
+          max(0,parcelArea, parcelsx$paveAreaCon[parcelsx$parcelID == pcx_demolitions$parcelID[i]] - 
+                pcx_demolitions$conn[i] * pcx_demolitions$area_m2[i])
+        if(pcx_demolitions$conn[i] == 0)
+          parcelsx$paveAreaUncon[parcelsx$parcelID == pcx_demolitions$parcelID[i]] <- 
+            max(0,parcelArea, parcelsx$paveAreaUnCon[parcelsx$parcelID == pcx_demolitions$parcelID[i]] - 
+                  pcx_demolitions$area_m2[i])
+      }
+    }
+  }
+  ## connect ia that was unconnected before datex
+  ## First deal with sealing of Wattle Valley Rd and OConnor Avenue
+  if(sum(c(29, 30, 31, 38, 41, 54) %in% subcs$pipeID) > 0 & 
+     datex < as.Date("2006-06-01")){
+    unconParcels <- pcx$parcelID[pcx$changeType == "connection" & 
+                                             pcx$date == "2006-06-01"]
+    uncon_index <- which(parcelsx$parcelID %in% unconParcels)
+    parcelsx$roofAreaUncon[uncon_index] <- (parcelsx$roofAreaUncon + parcelsx$roofAreaCon)[uncon_index]
+    parcelsx$paveAreaUncon[uncon_index] <- (parcelsx$paveAreaUncon + parcelsx$paveAreaCon)[uncon_index]
+    parcelsx$roofAreaCon[uncon_index] <- 0
+    parcelsx$paveAreaCon[uncon_index] <- 0
+  }
+  pcx_connections <- pcx[pcx$changeType == "connection" & pcx$date != "2006-06-01",]
+  if(dim(pcx_connections)[1] > 0){
     iax$conn[iax$polyID %in% pcx_connections$polyID] <- 1
-  #4. restrict scmProjects to those subcs and correct for parcelChanges before datex
+  }
+  #remaining 4 properties for which connection changed are all entered as connected in the parcels table.
+  #deal with them manually.
+  if(datex < "2017-05-15"){ 
+    parcelsx$paveAreaCon[parcelsx$parcelID == 2710] <- 158.7423 - 124.43073
+    parcelsx$paveAreaUncon[parcelsx$parcelID == 2710] <- 124.43073
+    parcelsx$roofAreaCon[parcelsx$parcelID == 2863] <- 287.4764 - 51.42724
+    parcelsx$roofAreaUncon[parcelsx$parcelID == 2863] <- 51.42724
+  }
+  if(datex < "2011-02-01"){ 
+    parcelsx$paveAreaCon[parcelsx$parcelID == 2689] <- 487.5849  - 20
+    parcelsx$paveAreaUncon[parcelsx$parcelID == 2689] <- 20
+  }
+  if(datex < "2017-06-28"){ 
+      parcelsx$paveAreaUncon[parcelsx$parcelID == 2710] <- 401.78709
+      parcelsx$paveAreaCon[parcelsx$parcelID == 2710] <- 0
+  }
+      #4. restrict scmProjects to those subcs and correct for parcelChanges before datex
   scmProjectsx <- scmProjects[scmProjects$pipeID %in% subcsx$pipeID &
                                 scmProjects$installDate < datex,]
   #5. restrict SCMs to relevant scmProjects and update specs according to scmChanges and scmsDecommissioned
@@ -469,13 +561,17 @@ data_on_datex <- function(pipeID, datex){
     raingardensx$impCarea[raingardensx$scmID == "RPNR502"] <- sum((iax$area_m2*iax$conn)[!is.na(iax$nextds) & iax$nextds == "RPNR502"])
     #5c. If there are any public SCMs that capture all pipeID impervious runoff
     #upstream (PLs), then adjust their catchment areas to account for SCMs upstream
-    PLs <- scmProjects[scmProjects$round %in% c("PL","DBS KCC raingardens") & is.na(scmProjects$parcelID),]
+    PLs <- scmProjects[scmProjects$round %in% c("PL","DBS KCC raingardens") & 
+                         is.na(scmProjects$parcelID),]
     PLs <- PLs[!PLs$projectID %in% c("PL-8-Pembroke (Morrisons Reserve)",
                                      "PL-24-Petrol Station"),]
     # 3 PLs with SCM receiving all pipeID runoff not the most upstream SCM
+    PL_scms <- vector()
+    if(sum(subcsx %in% c(8,24,56))){
     PL_scms <- c("RPLR544", #terminal rg at Primary school
                  "RPLT537", #main tank at Petrol Station
                  "RPLT542") #main tank at Pembroke
+    }
     #For the rest, most upstream SCM receives the catchment runoff....
     for(i in 1:dim(PLs)[1]){
       scmspli <- SCMs[SCMs$projectID == PLs$projectID[i],]
@@ -489,7 +585,8 @@ data_on_datex <- function(pipeID, datex){
       for(i in 1:dim(PL_scmsx)[1]) {
         us_scmsi <- allupstream(SCMsx, PL_scmsx$scmID[i],"scmID")[-1]
         us_subcs <- allupstream(subcsx, PL_scmsx$pipeID[i], "pipeID")
-            direct_ia <- sum((iax$area_m2*iax$conn)[iax$pipeID %in% us_subcs]) - 
+            direct_ia <- sum((parcelsx$roofAreaCon + parcelsx$paveAreaCon)[parcelsx$pipeID %in% us_subcs]) - 
+                        #sum((iax$area_m2*iax$conn)[iax$pipeID %in% us_subcs]) - 
             sum(raingardensx$impCarea[raingardensx$scmID %in% us_scmsi]) -
             sum(tanksx$tankCarea[tanksx$scmID %in% us_scmsi]) - 
             sum(ddsx$ddCarea[ddsx$scmID %in% us_scmsi])
@@ -633,8 +730,9 @@ ia_ts <- function(pipeID,
     db <- data_on_datex(pipeID, lubridate::ymd(change_dates[i] + days(1))) 
     ia_ts[date >= change_dates[i], 
           `:=` (carea = sum(db$subcs$scarea),
-                tia = sum(db$ia$area_m2),
-                eia = sum(db$ia$area_m2*db$ia$conn))]
+                tia = sum(db$parcels$roofAreaCon + db$parcels$paveAreaCon + 
+                            db$parcels$roofAreaUncon + db$parcels$paveAreaUncon), 
+                eia = sum(db$parcels$roofAreaCon + db$parcels$paveAreaCon))]
   }
     }
   ia_ts
@@ -1084,7 +1182,10 @@ budget_scm_on_datex <- function(scmID,
                                  additional.inflow = adflow)
       dailybudgets[[j]] <- tankjMod$daily_budget
       names(dailybudgets)[j] <- allusi[j]
-      start_stores$store[start_stores$scmID == tankj$scmID] <- tankj$tankBegin
+      start_stores$store[start_stores$scmID == tankj$scmID] <- 
+        ifelse(specs_for_EB, tankj$tankBegin, 
+               ifelse(tankj$scmID %in% scm_start_vol$scmID,
+                      scm_start_vol$store[scm_start_vol$scmID == tankj$scmID], 0))
       if (grepl("stormwater",tankj$leakTo)){
         hourlybudgets[[j]] <- tankjMod$hourly_budget
         names(hourlybudgets)[j] <- allusi[j]
@@ -1190,7 +1291,10 @@ budget_scm_on_datex <- function(scmID,
       hourlybudgets[[j]] <- rb$hourlyBudget
       leak_fates$exf[[j]] <- sum(rb$hourlyBudget$exf)
       names(dailybudgets)[j] <- names(hourlybudgets)[j] <- allusi[j]
-      start_stores$store[start_stores$scmID == rgj$scmID] <- rgj$Vstart
+      start_stores$store[start_stores$scmID == rgj$scmID] <- 
+        ifelse(specs_for_EB, rgj$Vstart,
+               ifelse(rgj$scmID %in% scm_start_vol$scmID,
+                      scm_start_vol$store[scm_start_vol$scmID == rgj$scmID], 0))
       end_stores$store[end_stores$scmID == rgj$scmID] <- 
         rb$hourlyBudget$store[length(rb$hourlyBudget$store)]
   }
@@ -1798,11 +1902,23 @@ EI_subc_time_series <- function(pipeID,
   non_term_dates <- data.frame(scmID = NA, date = lubridate::ymd("2000-01-01"), 
                                stringsAsFactors = FALSE)
   idates <- c(start_date, idates) #if(length(idates) == 0)
+  PLs <- scmProjects[is.na(scmProjects$parcelID) & 
+                       scmProjects$projectID %in% scmps$projectID,]
+  terminal_scms <- vector("character")
   for(i in 1:length(idates)){
     db <- data_on_datex(pipeID, idates[i] + days(1))
+    # if(dim(PLs)[1] > 0){
+    #   if(pipeID %in% PLs$pipeID){
+    #     pl_scms <- SCMs[SCMs$projectID %in% PLs$projectID[PLs$pipeID == pipeID],]
+    #     terminal_scms <- c(terminal_scms,
+    #                        pl_scms$scmID[!pl_scms$scmID %in% pl_scms$nextds])
+    #   }
+    # }
+    if(length(terminal_scms) == 0){
     if(i == 1){
-      terminal_scms <- db$SCMs$scmID[is.na(db$SCMs$nextds) | 
-                                       db$SCMs$nextds == "land"]
+      terminal_scms <- c(terminal_scms,
+                         db$SCMs$scmID[is.na(db$SCMs$nextds) | 
+                                       db$SCMs$nextds == "land"])
     }
     if(i > 1){
       new_tcsms <- db$SCMs$scmID[is.na(db$SCMs$nextds) | 
@@ -1816,6 +1932,7 @@ EI_subc_time_series <- function(pipeID,
                                            stringsAsFactors = FALSE))
                                   }
       terminal_scms <- unique(c(terminal_scms, new_tcsms))
+    }
     }
   }
   non_term_dates <- non_term_dates[-1,]
@@ -1948,7 +2065,7 @@ budget_scm_time_series <- function(scmID, runoffData){
                                               runoffData$daily$date <= change_dates[i+1]],
                    hourly = runoffData$hourly[runoffData$hourly$datetime > runoffData$hourly$datetime[which(runoffData$daily$date == change_dates[i])*24] & 
                                               runoffData$hourly$datetime <= runoffData$hourly$datetime[which(runoffData$daily$date == change_dates[i+1])*24]])
-      budget_ts <- budget_scm_on_datex(scmID, change_dates[i] + days(), runoffData = rodi,
+      budget_ts <- budget_scm_on_datex(scmID, change_dates[i] + days(1), runoffData = rodi,
                                        scm_start_vol = begin_store,
                                        specs_for_EB = FALSE)
       end_stores <- budget_ts$end_stores
