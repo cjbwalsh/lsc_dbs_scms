@@ -92,7 +92,7 @@ plot.new()
 legend("center",pch = 1, col = RColorBrewer::brewer.pal(9,"Set1"), legend = sitecodes, 
        title = "Site", cex = 1)
 ```
-Fig.S5-`r fig_no`. Distributions of A. $\Delta$*EI~S~* and B. log(*EI~S1*) as a function of t, the `r dim(sim_set)[1]` sampling dates in the simulated dataset.  
+#### Fig.S5-`r fig_no`. Distributions of A. $\Delta$*EI~S~* and B. log~10~(*EI~S1~* + 0.1) as a function of t, the `r dim(sim_set)[1]` sampling dates in the simulated dataset.  
 
 The simulated response variables —-- *y* and *y1* --- were hypothetical versions of log~10~(FRP). Individual samples of *y* and *y1* varied among sites as a function of EI as observed for log~10~(median FRP) (Fig. 1A).   
 
@@ -152,8 +152,9 @@ plot(sim_set$del_ei_s, sim_set$y1,
      col = RColorBrewer::brewer.pal(9,"Set1")[match(sim_set$site, sitecodes)],
      xlab = expression(~Delta~EI[S]), ylab = "y1", las = 1)
 title(main = "D.", adj = 0)
-
+fig_no <- fig_no + 1 
 ```
+#### Fig.S5-`r fig_no`. Distributions of y (A, C) and y1 (B, D) against log~10~(*EI~S1* + 0.1) (A, B) and $\Delta$*EI~S~* (C, D). 
 
 The effect of SCMs installed as part of the experiment was assessed by the $\Delta$*EI~S~* term in the model
 
@@ -161,7 +162,7 @@ $$
 y_j = \beta_1+ \beta_2 EI_S1 + \beta_3 \Delta EI_s + \beta_{4j} t + \beta_5 autoT+ \epsilon_j
 $$
 
-where $y_j$ is the response variable (either *y* or *y1*) in the *j*th site;  $\beta_1$ is the intercept of the model representing the value of y in the reference state (where untransformed *EI_S1* = 0.1%), with $\Delta$*EI~S~* and t = 0; $\beta_2$ represents the effect of *EI_S1*; $\beta_3$ represents the effect of 〖∆EI〗_S (only non-zero in experimental sites after SCM manipulation had begun); $\beta_4$ represents the effect of time, t, within each site, each with 76 equally-spaced samples;  $\beta_5$ represents the effect of temporal autocorrelation, autoT, among samples from each site; and ε_j is the random site effect. To derive the temporal autocorrelation variable, we first derived the model without an autoT term, and used the residual value from this model for the preceding time in each site.
+where $y_j$ is the response variable (either *y* or *y1*) in the *j*th site;  $\beta_1$ is the intercept of the model representing the value of y in the reference state (where untransformed *EI_S1* = 0.1%), with $\Delta$*EI~S~* and t = 0; $\beta_2$ represents the effect of *EI_S1*; $\beta_3$ represents the effect of $\Delta$*EI~S~* (only non-zero in experimental sites after SCM manipulation had begun); $\beta_4$ represents the effect of time, t, within each site, each with 76 equally-spaced samples;  $\beta_5$ represents the effect of temporal autocorrelation, autoT, among samples from each site; and $\epsilon_j$ is the random site effect. To derive the temporal autocorrelation variable, we first derived the model without an autoT term, and used the residual value from this model for the preceding time in each site.
 
 For each model, we estimated the posterior distributions of all parameters using a Markov chain Monte Carlo sampler implemented in Stan [@CarpenterEtAl_2017]. We called Stan from R [@rcoreteam_2020] using the library rstan [@StanDevelopmentTeam_2020].  The random site effect and all $\beta$ parameters were drawn from normal distributions with estimated means.  We specified prior distributions of $\beta$ parameters as diffuse normal distributions (mean 0, standard deviation 5), and of  parameters as diffuse normal distributions (mean zero and estimated standard deviations).  Prior distributions for standard deviations of $\beta$ parameters and the residual model error were cauchy distributions (mean 0, scale 2.5). We drew inference from 16,000 posterior samples taken from 4 unthinned chains (4000 per chain having discarded 5000 warm-up values of each chain), using the Markov chain Monte Carlo sampler of Stan [@StanDevelopmentTeam_2021].  
 
@@ -219,7 +220,7 @@ sim_set_mod <- stan(file = "code/sim_set_vary_t.stan",
                     data = data_list, chains = nChains, iter = nIter,
                     warmup = nWarmup, save_warmup = FALSE,
                     pars =  pars_to_sample,
-                    control = list(adapt_delta = 0.99, max_treedepth = 15),
+                    control = list(adapt_delta = 0.995, max_treedepth = 15),
                     seed = -237947234 ) # ~ 1.5 min to run 
 sim_set$non_auto_resids <- sim_set$y1 -  
   as.data.frame(summary(sim_set_mod, pars = "y_pred", probs = c(0.5), 
@@ -254,7 +255,7 @@ sim_set_mod_auto_t <- stan(file = "code/sim_set_vary_t_auto_t.stan",
                     data = data_list, chains = nChains, iter = nIter,
                     warmup = nWarmup, save_warmup = FALSE,
                     pars =  pars_to_sample,
-                    control = list(adapt_delta = 0.99, max_treedepth = 15),
+                    control = list(adapt_delta = 0.995, max_treedepth = 15),
                     seed = -237947234 )  #~5 min to run
 save(sim_set_mod_auto_t, file = paste0("data/sim_set_mod_auto_t_",
                                        ifelse(i == 1, "y1", "y"), ".rda"), 
@@ -267,28 +268,27 @@ if (i == 1) remove(sim_set_mod_auto_t)
 source("code/stan_utility.R")
 mt_summary <- as.data.frame(summary(sim_set_mod_auto_t)$summary)
 #Rhat for all parameters should be <1.1
-max(mt_summary$Rhat)  # y model 1.007, y1 model 1.009 (y1 without auto_t 1.0147)
+max(mt_summary$Rhat)  # y model 1.004, y1 model 1.001
 #Bulk effective sample size should be >100 x number of chains (https://mc-stan.org/misc/warnings.html#Bulk_ESS)
 mon <- as.data.frame(monitor(sim_set_mod_auto_t))
-min(mon$Bulk_ESS)/nChains # y model 207, y1 model 271 (y1 without auto_t 197)
+min(mon$Bulk_ESS)/nChains # y model 282.5, y1 model 226 (y1 without auto_t 197)
 row.names(mon[which.min(mon$Bulk_ESS),]) #(for parameter lp__)
 #Tail effective sample size, same requirement as for Bulk_ESS
-min(mon$Tail_ESS)/nChains # y model 184, y1 model 241 (y1 without auto_t 209.3), 
+min(mon$Tail_ESS)/nChains # y model 227, y1 model 233 (y1 without auto_t 209.3), 
 row.names(mon)[which.min(mon$Tail_ESS)] #(for parameter lp__
 #Tree depth should not have been saturated in any iterations: should be 0%
 check_treedepth(sim_set_mod_auto_t, max_depth = 15)  #y model 0%, y1 models 0%
 #Energy Bayesian Fraction of Missing Information should be >= 0.2 in all chains
 get_bfmi(sim_set_mod_auto_t)
-# y model, 0.4673556 0.4373743 0.3782726 0.3447743
-# y1 model, 0.4019284 0.4953384 0.3575872 0.4353846 (similar without auto_t)
+# y model, 0.3876457 0.4275368 0.4699209 0.4066458
+# y1 model, 0.4105023 0.4088967 0.4141952 0.4036192 (similar without auto_t)
 #Number of iterations ending in a divergence should be 0
-check_div(sim_set_mod_auto_t) #  y model 2 (0.0125%), y1 model also 2
+check_div(sim_set_mod_auto_t) #  y model 1 (0.00625%), y1 model zero
 #Visual checks of traceplots and...conducted using shinystan()
 #shinystan::launch_shinystan(sim_set_mod_auto_t)
-# despite v small no. of divergent transitions, the traces look fine, 
+# despite one divergent transition, the traces look fine, 
 # and coefficient distributions seem unchanged for many different runs of the 
-# model (with diff seeds), so these few divergent transitions are unimportant.
-
+# model (with diff seeds), so this one transition is unimportant.
 ```
 The Stan model without a temporal autocorrelation term (sim_set_vary_t.stan).  
 
