@@ -1890,7 +1890,7 @@ EI_subc_time_series <- function(pipeID,
                                 start_date = as.Date("2001-01-01"), 
                                 fin_date = as.Date("2019-12-31"),
                                 runoffData = Croydon){
-    if(start_date < "2001-01-01")
+  if(start_date < "2001-01-01")
     stop("Earliest start date is '2001-01-01'", call. = FALSE)
   allusi <- allupstream(subcs, pipeID, "pipeID")
   #For every scmProject in pipeID, find terminal scmIDs on installDate, and 
@@ -1901,28 +1901,16 @@ EI_subc_time_series <- function(pipeID,
   idates <- idates[idates < fin_date & idates >= start_date]
   non_term_dates <- data.frame(scmID = NA, date = lubridate::ymd("2000-01-01"), 
                                stringsAsFactors = FALSE)
-  idates <- c(start_date, idates) #if(length(idates) == 0)
-  PLs <- scmProjects[is.na(scmProjects$parcelID) & 
-                       scmProjects$projectID %in% scmps$projectID,]
-  terminal_scms <- vector("character")
+  idates <- unique(c(start_date, idates)) #if(length(idates) == 0)
   for(i in 1:length(idates)){
     db <- data_on_datex(pipeID, idates[i] + days(1))
-    # if(dim(PLs)[1] > 0){
-    #   if(pipeID %in% PLs$pipeID){
-    #     pl_scms <- SCMs[SCMs$projectID %in% PLs$projectID[PLs$pipeID == pipeID],]
-    #     terminal_scms <- c(terminal_scms,
-    #                        pl_scms$scmID[!pl_scms$scmID %in% pl_scms$nextds])
-    #   }
-    # }
-    if(length(terminal_scms) == 0){
     if(i == 1){
-      terminal_scms <- c(terminal_scms,
-                         db$SCMs$scmID[is.na(db$SCMs$nextds) | 
-                                       db$SCMs$nextds == "land"])
+      terminal_scms <- db$SCMs$scmID[is.na(db$SCMs$nextds) | 
+                                       db$SCMs$nextds == "land"]
     }
     if(i > 1){
       new_tcsms <- db$SCMs$scmID[is.na(db$SCMs$nextds) | 
-                                 db$SCMs$nextds == "land"]
+                                   db$SCMs$nextds == "land"]
       non_terms <- terminal_scms[!(terminal_scms %in% new_tcsms)]
       non_terms <- non_terms[!non_terms %in% non_term_dates$scmID]
       if(length(non_terms) > 0){
@@ -1930,9 +1918,8 @@ EI_subc_time_series <- function(pipeID,
                                 data.frame(scmID = non_terms,
                                            date = idates[i],
                                            stringsAsFactors = FALSE))
-                                  }
+      }
       terminal_scms <- unique(c(terminal_scms, new_tcsms))
-    }
     }
   }
   non_term_dates <- non_term_dates[-1,]
@@ -1941,8 +1928,8 @@ EI_subc_time_series <- function(pipeID,
     decomms <- which(non_term_dates$scmID %in% scmsDecommissioned$scmID)
     for(j in decomms){
       if(scmsDecommissioned$decommDate[scmsDecommissioned$scmID == non_term_dates$scmID[j]] < non_term_dates$date[j])
-if(length(non_term_dates$date[j]) != sum(scmsDecommissioned$scmID == non_term_dates$scmID[j])) stop("1670")
-              non_term_dates$date[j] <- 
+        if(length(non_term_dates$date[j]) != sum(scmsDecommissioned$scmID == non_term_dates$scmID[j])) stop("1670")
+      non_term_dates$date[j] <- 
         scmsDecommissioned$decommDate[scmsDecommissioned$scmID == non_term_dates$scmID[j]]
     }
   }
@@ -1954,37 +1941,40 @@ if(length(non_term_dates$date[j]) != sum(scmsDecommissioned$scmID == non_term_da
     for(j in 1:length(dcs)){
       if(length(dcs[j]) != sum(scmsDecommissioned$scmID == dcs[j])) stop()
       non_term_dates <- rbind(non_term_dates,
-                                   data.frame(scmID = dcs[j],
-                                              date = scmsDecommissioned$decommDate[scmsDecommissioned$scmID == dcs[j]],
-                                              stringsAsFactors = FALSE))
+                              data.frame(scmID = dcs[j],
+                                         date = scmsDecommissioned$decommDate[scmsDecommissioned$scmID == dcs[j]],
+                                         stringsAsFactors = FALSE))
     }
   }
   # db <- data_on_datex(pipeID, fin_date)
   # carea <- db$subcs$carea[db$subcs$pipeID == pipeID]
   iats <- ia_ts(pipeID, start_date = start_date, fin_date = fin_date)
   iats$s <- iats$ro <- iats$vr <- iats$fv <- iats$wq  <- iats$eb <- iats$eia
-  for(i in 1:length(terminal_scms)){
-    if(terminal_scms[i] %in% non_term_dates$scmID) {
+  for (i in 1:length(terminal_scms)) {
+    if (terminal_scms[i] %in% non_term_dates$scmID) {
       end <- non_term_dates$date[non_term_dates$scmID == terminal_scms[i]]
     }else{
       end <- fin_date
     }
-   EBi <- data.table::data.table(EB_scm_time_series(terminal_scms[i], start_date, end, runoffData = runoffData))
-   EBi_dates <- unique(c(EBi$date, end))
-    for(j in 1:(length(EBi_dates)-1)){
-      iats[iats$date > EBi_dates[j] & iats$date <= EBi_dates[j + 1],
+    EBi <- data.table::data.table(EB_scm_time_series(terminal_scms[i], start_date, end, runoffData = runoffData))
+    EBi_dates <- unique(c(EBi$date, end))
+    for (j in 1:(length(EBi_dates) - 1)) {
+      iats[iats$date >= EBi_dates[j] & 
+          iats$date < ifelse(EBi_dates[j + 1] == fin_date, EBi_dates[j + 1] + lubridate::days(1), EBi_dates[j + 1]),
            c("s","ro","vr","fv","wq","eb")] <- 
-        iats[iats$date > EBi_dates[j] & iats$date <= EBi_dates[j + 1],
+        iats[iats$date >= EBi_dates[j] & 
+             iats$date < ifelse(EBi_dates[j + 1] == fin_date, EBi_dates[j + 1] + lubridate::days(1), EBi_dates[j + 1]),
              c("s","ro","vr","fv","wq","eb")] - 
-        EBi[rep(j,sum(iats$date > EBi_dates[j] & iats$date <= EBi_dates[j + 1])),
+        EBi[rep(j,sum(iats$date >= EBi_dates[j] & 
+            iats$date < ifelse(EBi_dates[j + 1] == fin_date, EBi_dates[j + 1] + lubridate::days(1), EBi_dates[j + 1]))),
             c("EB_max","RO","VR","FV","WQ","EB")] * 100
       # * 100 because the original EB score was scaled to 100 m2, this converts EB unit to m
     }
-    if(i == 1){
+    if (i == 1) {
       EBs <- EBi
     }else{
       EBs <- rbind(EBs, EBi)
-      }
+    }
   } 
   carea <- iats$carea
   cols <- c("tia","eia","eb","wq","fv","vr","ro","s")
