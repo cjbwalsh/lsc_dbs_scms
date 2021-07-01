@@ -134,6 +134,60 @@ prepare_runoff_data <- function(hourly_data,
 Croydon <- prepare_runoff_data(get(load(paste(here::here("data"), 
           "/Croydon_1966_hourly_rain_runoff_et.rda", sep = ""))))  
 
+# alldownstream() ---------------------------------
+#' Find all subcatchments downstream of a site in a dendritic hierarchy  
+#' 
+#' @param hierarchy a data.frame or data.table with a unique 
+#'    field (a subcatchment or reach code) with name specified by the 
+#'    subc' argument, and a 'nextds' field identifying the next 
+#'    'subc' downstream
+#' @param catchname a value in the 'subc' field for which all subcs 
+#'     upstream are to be extracted
+#'    'hierarchy'.  
+#' @param subc a character string indicating the column name identifying each 
+#'      subcatchment.  
+#' @return a vector of all subcs downstream of (and including) 'catchname.
+#' @details adapted from the function with the same name in 
+#' wergStaff/ChrisW/R functions/catchcompile.functions.R for use with the
+#' spatial tables of the lsc_dbs_scms database
+#' @examples
+#' # # load tables from lsc_dbs_scms database, including the subcs table
+#' # load("data/lscdbsSCMs_db.rda")
+#' # # All sites upstream of pipeID 53
+#' # alldownstream(hierarchy = subcs, catchname = "29", subc = "pipeID")
+
+alldownstream <- function(hierarchy, catchname, subc = "site"){
+    if("sf" %in% class(hierarchy))
+      sf::st_geometry(hierarchy) <- NULL
+    if(subc != "site")
+      hierarchy$site <- as.vector(hierarchy[,subc])
+    if(length(which(hierarchy$site==catchname))>0){
+      catchname <- as.vector(catchname)
+    allsc <- as.vector(hierarchy$nextds[hierarchy$site==catchname])
+    allsc <- allsc[!is.na(allsc)]
+    #subcatchments immediately upstream
+    nbrnch <- end <- length(allsc)
+    #number of branches immediately upstream
+    start <- 1
+    while(nbrnch > 0 & !-1 %in% allsc)
+    {
+      for(j in start:end)
+      {
+        allsc <- c(allsc,as.vector(hierarchy$nextds[hierarchy$site == allsc[j]]))
+        allsc <- allsc[!is.na(allsc)]
+      }
+      start <- end + 1
+      end <- length(allsc)
+      nbrnch <- end - (start - 1)
+    }
+    allsc <- c(catchname,allsc)
+    allsc <- allsc[allsc != -1]
+    allsc
+  } else{
+    cat(paste(catchname,"is not a site listed in the hierarchy table","\n"))
+  }
+  }
+
 # allupstream() ---------------------------------  
 #' Find all subcatchments upstream of a site in a dendritic hierarchy  
 #' 
@@ -192,60 +246,6 @@ allupstream <- function(hierarchy,catchname, subc = "site"){
   } else
     cat(paste(catchname,"is not a site listed in the hierarchy table","\n"))
 }
-
-# alldownstream() ---------------------------------
-#' Find all subcatchments downstream of a site in a dendritic hierarchy  
-#' 
-#' @param hierarchy a data.frame or data.table with a unique 
-#'    field (a subcatchment or reach code) with name specified by the 
-#'    subc' argument, and a 'nextds' field identifying the next 
-#'    'subc' downstream
-#' @param catchname a value in the 'subc' field for which all subcs 
-#'     upstream are to be extracted
-#'    'hierarchy'.  
-#' @param subc a character string indicating the column name identifying each 
-#'      subcatchment.  
-#' @return a vector of all subcs downstream of (and including) 'catchname.
-#' @details adapted from the function with the same name in 
-#' wergStaff/ChrisW/R functions/catchcompile.functions.R for use with the
-#' spatial tables of the lsc_dbs_scms database
-#' @examples
-#' # # load tables from lsc_dbs_scms database, including the subcs table
-#' # load("data/lscdbsSCMs_db.rda")
-#' # # All sites upstream of pipeID 53
-#' # alldownstream(hierarchy = subcs, catchname = "29", subc = "pipeID")
-
-alldownstream <- function(hierarchy, catchname, subc = "site"){
-    if("sf" %in% class(hierarchy))
-      sf::st_geometry(hierarchy) <- NULL
-    if(subc != "site")
-      hierarchy$site <- as.vector(hierarchy[,subc])
-    if(length(which(hierarchy$site==catchname))>0){
-      catchname <- as.vector(catchname)
-    allsc <- as.vector(hierarchy$nextds[hierarchy$site==catchname])
-    allsc <- allsc[!is.na(allsc)]
-    #subcatchments immediately upstream
-    nbrnch <- end <- length(allsc)
-    #number of branches immediately upstream
-    start <- 1
-    while(nbrnch > 0 & !-1 %in% allsc)
-    {
-      for(j in start:end)
-      {
-        allsc <- c(allsc,as.vector(hierarchy$nextds[hierarchy$site == allsc[j]]))
-        allsc <- allsc[!is.na(allsc)]
-      }
-      start <- end + 1
-      end <- length(allsc)
-      nbrnch <- end - (start - 1)
-    }
-    allsc <- c(catchname,allsc)
-    allsc <- allsc[allsc != -1]
-    allsc
-  } else{
-    cat(paste(catchname,"is not a site listed in the hierarchy table","\n"))
-  }
-  }
 
 # scmMap() ---------------------------------  
 #' Draw a map showing all stormwater control measures (SCMs) and their 
@@ -1001,6 +1001,300 @@ calcDDBudget <- function(ddi,
              void = initLoss*ddi$ddNo))
 }
 
+# EB_scm_on_datex() ---------------------------------
+#' Calculate Environmental Benefit Index of a stormwater control measure (SCM)
+#' in the lsc_dbs_scm database on a specific date.
+#' @param scmID a scmID of and SCM in table SCMs
+#' @param runoffData rainfall and runoff time series used for EB calculation. 
+#'     Default is Croydon loaded above.
+#' @param R_n pre-urban overland flow frequency = target number of impervious runoff days 
+#' @param Nconc_n target N concentration, default 0.6 mg/L
+#' @param Pconc_n target P concentration, default 0.05 mg/L
+#' @param TSSconc_n target TSS concentration, default 20 mg/L
+#' @param percentile percentile concentration used for water quality targets, 
+#'     default median
+#' @param max_filter_flow_rate target maximum filtered flow rate, default 0.3 L/h/m2
+#' @param reward.overextraction logical, if TRUE volume reduction index can 
+#'       exceed 1. Over-extraction from any one SCM can be rewarded if overall, 
+#'       volume reduction is well below target (and EB is being used as a cost
+#'       mechanism)
+#' @param override.FV_n logical for use in parallel SCMs, where one 
+#'       system leaks more than permissible by itself. Excess filtered volume 
+#'       can be acceptable if overall, FV is well below target
+#' @return A list the sub-indices RO, RO_binary, VR, FV, and WQ; their 
+#'       component variables R, R(b), V, F and Nconc, Pconc, and TSSconc from
+#'       the SCM (_m), in the pre-urban state (_n), and from impervious surfaces 
+#'       (_u); the primary EB index (used to calculate S---1-EB/max(EB)]--- by 
+#'       Walsh et al. (2021 "Linking stormwater control performance to
+#'       stream ecosystem outcomes: incorporating a performance metric into 
+#'       effective imperviousness"), the EB_old_calc index (used by the EB 
+#'       calculator, and in the LSC project development, calculated using R_mb 
+#'       instead of R_m), and the maximum EB index value that could have been 
+#'       achieved by this SCM.
+#' @details See Walsh et al. 2021 "Linking stormwater control performance to
+#'      stream ecosystem outcomes: incorporating a performance metric into 
+#'      effective imperviousness" for descriptions of EB paramaters (expressed 
+#'      in the paper as S, which equals 1 - EB/max(EB)).
+#' @examples
+#' # # load tables from lsc_dbs_scms database, including all required tables
+#' # load("data/lscdbsSCMs_db.rda")
+#' # t(unlist(EB_scm_on_datex("RPLJ001", "2018-02-05")))
+#' #   #Fernhill Rd Jellyfish after King St Upper diversion: 
+#' #   # EB 69.6 (out of max potential of 110.6), ~30 s
+#' #  raingardens$medium[grep("J",raingardens$scmID)] <- "gravel (scoria)"
+#'   t(unlist(EB_scm_on_datex("RPLR558", "2018-02-05")))
+#' #  King St Upper raingarden after diversion # 47.1 / 136.7
+#' # t(unlist(EB_scm_on_datex("RPLJ001", "2018-02-04")))
+#' #   #Fernhill Rd Jellyfish before King St Upper diversion: 
+#' #   # EB 152.5 / 247.3, ~90 s (many upstream tanks with leaks to stormwater)
+#' # t(unlist(EB_scm_on_datex("D4D004", "2018-02-04")))
+#' #   # Not very effective downpipe diverter: EB 0.04 / 0.53, <1 s
+#' # t(unlist(EB_scm_on_datex("D4T105", "2018-02-04")))
+#' #   # a not great tank: EBc 0.23 / 0.98,  < 1 s
+#' # t(unlist(EB_scm_on_datex("RPLR527", "2018-02-04")))
+#' #   # Hereford Rd RB:  EB 73.0 / 117.7  ~2 s  
+
+EB_scm_on_datex <- function(scmID, 
+                            datex,
+                            runoffData = Croydon,
+                            R_n = 12, #Number of days of runoff in the pre-urban state
+                            Nconc_n = 0.6, Pconc_n = 0.05, TSSconc_n = 20, #Target contaminant concentrations 
+                            percentile = 50, #percentile used for assessing concentrations against n and u
+                            max_filter_flow_rate = 0.3,  #L/h/m2 of total imp catchment area should be ~0.1: see gardenmodel in modelfunctions2017.R
+                            reward.overextraction = TRUE, #Over-extraction from any one SCM rewarded if overall, volume reduction is well below target
+                            override.FV_n = FALSE #Excess filtered volume acceptable if overall, FV is well below target
+                            ) {
+     pipeID <- SCMs$pipeID[SCMs$scmID == scmID]
+     db_datex <- data_on_datex(pipeID, datex)
+     x <- budget_scm_on_datex(scmID, datex, runoffData)
+    if(scmID %in% c(db_datex$tanks$scmID, db_datex$dds$scmID)){
+      if(scmID %in% db_datex$tanks$scmID){
+         scm_stats <- db_datex$tanks[db_datex$tanks$scmID == scmID,]
+         gardenarea <- scm_stats$gardenArea
+         max_filter_flow_rate.L.h <- (x$imp_carea + 
+                                        ifelse(grepl("stormwater", scm_stats$leakTo), 0,  gardenarea)) * max_filter_flow_rate
+      }
+      if(scmID %in% db_datex$dds$scmID){
+         scm_stats <- db_datex$dds[db_datex$dds$scmID == scmID,]
+         gardenarea <- 10  #see Walsh and Fletcher 2014 for uncertainty (and irrelevance) around this
+         max_filter_flow_rate.L.h <- (x$imp_carea + 50) * max_filter_flow_rate
+         #for downpipe diverters, doesn't really matter because they are standard estimates, but this will be typical
+      }
+       Rmtab <- data.table::data.table(
+              data.frame(V_ui = runoffData$daily$runoff_mm*x$imp_carea,
+                        out = x$budget$out,
+                        over = x$budget$overflow))
+    Rmtab$too_much_out <- Rmtab$out
+    Rmtab$too_much_out[Rmtab$out <= max_filter_flow_rate.L.h*24] <- 0
+    #FVm filtered volume through the SCMs via out
+    F_m_out <- sum(Rmtab$out[Rmtab$out <= max_filter_flow_rate.L.h*24])
+    }
+  if(scmID %in% raingardens$scmID){
+    if(scmID %in% db_datex$raingardens$scmID){
+      scm_stats <- db_datex$raingardens[db_datex$raingardens$scmID == scmID,]
+      gardenarea <- scm_stats$Af
+    }
+    max_filter_flow_rate.L.h <- (x$imp_carea + gardenarea) * max_filter_flow_rate
+    Rmtab <- data.table::data.table(data.frame(
+                        date = runoffData$hourly$date,
+                        V_ui = runoffData$hourly$runoff_mm*x$imp_carea,
+                        out = x$hourly_budget$out,
+                        over = x$hourly_budget$overflow))
+    Rmtab$too_much_out <- Rmtab$out
+    Rmtab$too_much_out[Rmtab$out <= max_filter_flow_rate.L.h & Rmtab$over == 0] <- 0
+    Rmtab <- Rmtab[, lapply(.SD, sum, na.rm=TRUE), by=date, .SDcols=c("V_ui","out","over","too_much_out") ]
+    #FVm filtered volume through the SCMs via out
+    F_m_out <- sum(Rmtab$out - Rmtab$too_much_out)
+  }
+    ### It is possible in treatment trains for overflow to continue into the next day because of routing delay
+    ### This will be in the first hour of the next day. To avoid infinite Rm value, move any such delayed overflows
+    ### into the previous day
+    delayed_over_days <- which(Rmtab$over > 0 & Rmtab$V_ui == 0)
+    if(length(delayed_over_days) > 0){
+      for(i in 1:length(delayed_over_days)){
+        Rmtab$over[delayed_over_days[i] - 1] <- Rmtab$over[delayed_over_days[i] - 1] + Rmtab$over[delayed_over_days[i]]
+        Rmtab$over[delayed_over_days[i]] <- 0
+      }
+    }
+    #Number of days of impervious runoff either untreated or filtered, but above the threshold 'base'flow
+    Rmtab$V_oi <- (Rmtab$too_much_out + Rmtab$over)
+    Rmtab$R_mi <- Rmtab$V_oi/Rmtab$V_ui
+    Rmtab$R_mi[is.na(Rmtab$R_mi) | Rmtab$V_ui == 0] <- 0
+    #R_mb is the binary version of Rm (see equations in Foundation paper) -used in EB calculator, but not in the paper 
+    R_mb <- sum((Rmtab$V_oi) > 0)
+    #R_m is the proportional version of Rm used in the Foundation paper
+    R_m <- sum(Rmtab$R_mi)
+    R_u <- sum(runoffData$daily$runoff_mm > 0) #121 Number of days of runoff from impervious surfaces
+    
+### 1. Runoff frequency index, RO
+    RO <- (1 - max((R_m - R_n)/(R_u - R_n), 0)) * x$imp_carea/100
+    RO_binary <- (1 - max((R_mb - R_n)/(R_u - R_n), 0)) * x$imp_carea/100
+
+### 2. Volume reduction index, VR
+    # Theoretical streamflow coefficients for forested and pasture catchments
+    mean.annrain.mm <- sum(runoffData$daily$rain_mm)
+    Zhang.forest.ro <- 1 - (1 + 2820/mean.annrain.mm)/(1 + 2820/mean.annrain.mm + mean.annrain.mm/1410)
+    Zhang.pasture.ro <- 1 - (1 + 550/mean.annrain.mm)/(1 + 550/mean.annrain.mm + mean.annrain.mm/1100)
+    # if there is less in the SCMs at the end than in the beginning, 
+    # ignore this difference i.e. if system is fuller at end of run
+    # than at start, then don't include the difference as lost (i.e. used and 
+    # fallen during the period) water. If it is emptier and the difference is 
+    # greater than the runoff from the SCM, then don't adjust for the difference
+    delstore <- max(0, max(0, sum(x$start_stores$store) - sum(x$end_stores$store)))
+    delstore <- ifelse(delstore > sum(c(x$budget$out,x$budget$overflow,x$budget$exf)) + 
+                         sum(x$leak_fates$exf),0,delstore)
+    #tank/rg start volume = store[1] + use[1] + exf[1] + et[1]
+    V_m <- sum(c(x$budget$out,x$budget$overflow,x$budget$exf)) - 
+               sum(x$leak_fates$et) - delstore  #sum(totLostVol)
+    V_u <- sum(Rmtab$V_ui) 
+    V_n <- x$imp_carea * Zhang.forest.ro * mean.annrain.mm
+    VR <- (1 - max((V_m - V_n)/(V_u - V_n), 0)) * x$imp_carea/100
+    if(reward.overextraction) {
+    # thus possible for a specific SCM to score VR > max EB: useful if using the  
+    # EB index to value projects and aiming for catchment-wide volume reduction, 
+    # but not able to achieve it in all SCMs.
+      VR <- (1 - (V_m - V_n)/(V_u - V_n)) * x$imp_carea/100
+        }
+
+### 3. Filtered flow volume index, FV
+      # filtered flows = upstream leaks to stormwater or exf (see above where they are partitioned into exf and out) + 
+      #                  upstream exf + 
+      #                  upstream out that is less than max_filter_flow_rate (F_m_out, calculated above)
+      # (all compiled in budget_scm_on_datex())
+      F_m <-  F_m_out + sum(x$budget$exf) - sum(x$leak_fates$et)
+      # impervious runoff minus runoff from mature forest according to Zhang curve.
+      F_pasture <- Zhang.pasture.ro * (x$imp_carea + gardenarea) * mean.annrain.mm
+      F_forest <- Zhang.forest.ro * (x$imp_carea + gardenarea) * mean.annrain.mm
+
+      if (F_m < F_forest) {
+          FV <- (F_m/F_forest) * x$imp_carea / 100
+          } else {
+      if (F_m > F_pasture) {
+          FV <- max(0, 1 - (F_m - F_pasture)/F_forest) * x$imp_carea/100
+          } else {
+          FV <- x$imp_carea/100
+           }
+          }
+  if(override.FV_n & F_m > F_forest) 
+    FV <- x$imp_carea/100
+
+### 4. water-quality index, WQ
+      #WQ logic -
+  #1. if the system overflows more frequently than the specified percentile, or 
+  #   if it is a tank with an unfiltered leak that flows more frequently than 
+  #   the specified percentile, then concentration is as bad as inflow stormwater. 
+  #   (or if it is a downpipe diverter, then infiltration flows are assumed to 
+  #   be negligible compared to the remaining flows that are untreated stormwater)
+  #2. If not, and it is a tank with a filtered leak, a leak to soil, or no leak, 
+  #   then the system makes no contribution to pollutant concentrations at 
+  #   [percentile] flows, so set concentration to zero.
+  #3. If not and it is a raingarden then use [percentile] concout values
+      Nconc_u <- 2.2
+      Pconc_u <- 0.35
+      TSSconc_u <- 150
+      UnfilteredLeak <- FALSE
+      Enviss <- FALSE
+      #downpipe diverters (are useless)
+  if (db_datex$SCMs$type[db_datex$SCMs$scmID == scmID] == "dd") {
+    Nconc_m <- Nconc_u
+    Pconc_m <- Pconc_u
+    TSSconc_m <- TSSconc_u
+  }
+      #Tanks
+  if (db_datex$SCMs$type[db_datex$SCMs$scmID == scmID] == "tank") {
+    allus_scms <- allupstream(SCMs, scmID, "scmID")
+    # if the tank or one of the tanks upstream have a filtered leak 
+    # (assumes that if one is filtered all are - certainly true in our study)
+    # or if the tank overflows to land, assume treatment to natural levels
+    leaks_to <- tanks$leakTo[tanks$scmID %in% allus_scms]
+    leaks_to <- leaks_to[!is.na(leaks_to)]
+    if (length(leaks_to) > 0 & 
+       sum(c("land","garden","filtered to stormwater") %in% leaks_to) > 0) {
+      UnfilteredLeak <- FALSE
+      leakRate <- sum(tanks$leak.rate[tanks$scmID %in% allus_scms])
+      if("filtered to stormwater" %in% leaks_to)
+        Enviss <- TRUE
+    }else{
+        leakRate <- scm_stats$leak.rate
+      }
+    # if they have an unfiltered leak to stormwater
+    # or if they overflow more than percentile of the time (highly unlikely) 
+    # or have an unfiltered leak or don't leak at all
+  if((scm_stats$leakTo[scm_stats$scmID == scmID] == "stormwater" &
+      scm_stats$leak.rate > 0) | 
+     quantile(x$budget$overflow, probs = percentile/100) > 0 |
+     UnfilteredLeak | leakRate == 0){
+    Nconc_m <- Nconc_u
+    Pconc_m <- Pconc_u
+    TSSconc_m <- TSSconc_u
+     }else{
+    # if they have a filtered leak, assume treatment achieved by Enviss filters
+    # which was used in all such systems in our study.
+       if(Enviss){
+    Nconc_m <- Nconc_u * 0.21
+    Pconc_m <- Pconc_u * 0.33
+    TSSconc_m <- TSSconc_u * 0.04
+    }else{
+    # if they leak or overflow to land or garden, assume treatment to pre-urban
+    # concentrations
+    Nconc_m <- Nconc_n
+    Pconc_m <- Pconc_n
+    TSSconc_m <- TSSconc_n
+    }
+       }
+  }
+      #Raingardens
+  if(db_datex$SCMs$type[db_datex$SCMs$scmID == scmID] == "rg"){
+    #If it overflows more than 'percentile' of the time (highly unlikely)
+    if(quantile(x$budget$overflow, probs = percentile/100) > 0){
+      Nconc_m <- Nconc_u
+      Pconc_m <- Pconc_u
+      TSSconc_m <- TSSconc_u
+    }else{
+      #if it doesn't overflow too much, and if it has an underdrain that releases filtered flow
+     if(quantile(x$budget$overflow, probs = percentile/100) == 0  & 
+        sum(x$hourly_budget$out > 0)){
+    Nconc_m <- as.vector(quantile(x$hourly_budget$Nconcout,
+                              probs = percentile/100, na.rm = TRUE))
+    Pconc_m <- as.vector(quantile(x$hourly_budget$Pconcout,
+                              probs = percentile/100, na.rm = TRUE))
+    TSSconc_m <- as.vector(quantile(x$hourly_budget$TSSout,
+                              probs = percentile/100, na.rm = TRUE))
+     }else{
+       #if it doesn't overflow too much, and if it only loses water through exfiltration
+       Nconc_m <- 0
+       Pconc_m <- 0
+       TSSconc_m <- 0
+     }
+    }
+  }
+  WQ <- mean(c((1 - max(0, (Nconc_m - Nconc_n)/
+                        (Nconc_u - Nconc_n))) * x$imp_carea/100,
+             (1 - max(0, (Pconc_m - Pconc_n)/
+                        (Pconc_u - Pconc_n))) * x$imp_carea/100,
+             (1 - max(0, (TSSconc_m - TSSconc_n)/
+                          (TSSconc_u - TSSconc_n))) * x$imp_carea/100))
+  # arguably these urban values (2.2, 0.35 and 150) are the more appropriate conc for 75th %ile
+  # this index can potentially score < 1 (if N is added to the system)
+  
+  # # potential rounding error in VR 
+  EB_max <- x$imp_carea/100
+  if(VR < 0 & abs(VR) < EB_max*0.0005) VR <- 0
+  #If any more negative, potential error....
+  
+ summary <- list("R_m" = R_m,"R_n" = R_n,"R_u" = R_u,"R_mb" = R_mb,
+                 "V_m" = V_m,"V_n" = V_n,"V_u" = V_u,
+                 "F_m" = F_m,"F_forest" = F_forest,"F_pasture" = F_pasture,"F_u" = 0,
+                 "Nconc_m" = Nconc_m,"Nconc_n" = Nconc_n,"Nconc_u" = Nconc_u,
+                 "Pconc_m" = Pconc_m,"Pconc_n" = Pconc_n,"Pconc_u" = Pconc_u,
+                 "TSSconc_m" = TSSconc_m,"TSSconc_n" = TSSconc_n,"TSSconc_u" = TSSconc_n,
+                 "RO" = RO,"RO_binary" = RO_binary,"VR" = VR,"FV" = FV,"WQ" = WQ, 
+                 "EB" = mean(c(RO,VR,FV,WQ)),
+                 "EB_old_calc" = mean(c(RO_binary,VR,FV,WQ)),
+                 "EB_max" = EB_max)
+ return(summary)
+}
+
 # budget_scm_on_datex() ---------------------------------
 #' Calculate water balance budget of a stormwater control measure (SCM)
 #' in the lsc_dbs_scm database on a specific date given a specified inflow series.
@@ -1373,300 +1667,6 @@ budget_scm_on_datex <- function(scmID,
        end_stores = end_stores)
 }
 
-# EB_scm_on_datex() ---------------------------------
-#' Calculate Environmental Benefit Index of a stormwater control measure (SCM)
-#' in the lsc_dbs_scm database on a specific date.
-#' @param scmID a scmID of and SCM in table SCMs
-#' @param runoffData rainfall and runoff time series used for EB calculation. 
-#'     Default is Croydon loaded above.
-#' @param R_n pre-urban overland flow frequency = target number of impervious runoff days 
-#' @param Nconc_n target N concentration, default 0.6 mg/L
-#' @param Pconc_n target P concentration, default 0.05 mg/L
-#' @param TSSconc_n target TSS concentration, default 20 mg/L
-#' @param percentile percentile concentration used for water quality targets, 
-#'     default median
-#' @param max_filter_flow_rate target maximum filtered flow rate, default 0.3 L/h/m2
-#' @param reward.overextraction logical, if TRUE volume reduction index can 
-#'       exceed 1. Over-extraction from any one SCM can be rewarded if overall, 
-#'       volume reduction is well below target (and EB is being used as a cost
-#'       mechanism)
-#' @param override.FV_n logical for use in parallel SCMs, where one 
-#'       system leaks more than permissible by itself. Excess filtered volume 
-#'       can be acceptable if overall, FV is well below target
-#' @return A list the sub-indices RO, RO_binary, VR, FV, and WQ; their 
-#'       component variables R, R(b), V, F and Nconc, Pconc, and TSSconc from
-#'       the SCM (_m), in the pre-urban state (_n), and from impervious surfaces 
-#'       (_u); the primary EB index (used to calculate S---1-EB/max(EB)]--- by 
-#'       Walsh et al. (2021 "Linking stormwater control performance to
-#'       stream ecosystem outcomes: incorporating a performance metric into 
-#'       effective imperviousness"), the EB_old_calc index (used by the EB 
-#'       calculator, and in the LSC project development, calculated using R_mb 
-#'       instead of R_m), and the maximum EB index value that could have been 
-#'       achieved by this SCM.
-#' @details See Walsh et al. 2021 "Linking stormwater control performance to
-#'      stream ecosystem outcomes: incorporating a performance metric into 
-#'      effective imperviousness" for descriptions of EB paramaters (expressed 
-#'      in the paper as S, which equals 1 - EB/max(EB)).
-#' @examples
-#' # # load tables from lsc_dbs_scms database, including all required tables
-#' # load("data/lscdbsSCMs_db.rda")
-#' # t(unlist(EB_scm_on_datex("RPLJ001", "2018-02-05")))
-#' #   #Fernhill Rd Jellyfish after King St Upper diversion: 
-#' #   # EB 69.6 (out of max potential of 110.6), ~30 s
-#' #  raingardens$medium[grep("J",raingardens$scmID)] <- "gravel (scoria)"
-#'   t(unlist(EB_scm_on_datex("RPLR558", "2018-02-05")))
-#' #  King St Upper raingarden after diversion # 47.1 / 136.7
-#' # t(unlist(EB_scm_on_datex("RPLJ001", "2018-02-04")))
-#' #   #Fernhill Rd Jellyfish before King St Upper diversion: 
-#' #   # EB 152.5 / 247.3, ~90 s (many upstream tanks with leaks to stormwater)
-#' # t(unlist(EB_scm_on_datex("D4D004", "2018-02-04")))
-#' #   # Not very effective downpipe diverter: EB 0.04 / 0.53, <1 s
-#' # t(unlist(EB_scm_on_datex("D4T105", "2018-02-04")))
-#' #   # a not great tank: EBc 0.23 / 0.98,  < 1 s
-#' # t(unlist(EB_scm_on_datex("RPLR527", "2018-02-04")))
-#' #   # Hereford Rd RB:  EB 73.0 / 117.7  ~2 s  
-
-EB_scm_on_datex <- function(scmID, 
-                            datex,
-                            runoffData = Croydon,
-                            R_n = 12, #Number of days of runoff in the pre-urban state
-                            Nconc_n = 0.6, Pconc_n = 0.05, TSSconc_n = 20, #Target contaminant concentrations 
-                            percentile = 50, #percentile used for assessing concentrations against n and u
-                            max_filter_flow_rate = 0.3,  #L/h/m2 of total imp catchment area should be ~0.1: see gardenmodel in modelfunctions2017.R
-                            reward.overextraction = TRUE, #Over-extraction from any one SCM rewarded if overall, volume reduction is well below target
-                            override.FV_n = FALSE #Excess filtered volume acceptable if overall, FV is well below target
-                            ) {
-     pipeID <- SCMs$pipeID[SCMs$scmID == scmID]
-     db_datex <- data_on_datex(pipeID, datex)
-     x <- budget_scm_on_datex(scmID, datex, runoffData)
-    if(scmID %in% c(db_datex$tanks$scmID, db_datex$dds$scmID)){
-      if(scmID %in% db_datex$tanks$scmID){
-         scm_stats <- db_datex$tanks[db_datex$tanks$scmID == scmID,]
-         gardenarea <- scm_stats$gardenArea
-         max_filter_flow_rate.L.h <- (x$imp_carea + 
-                                        ifelse(grepl("stormwater", scm_stats$leakTo), 0,  gardenarea)) * max_filter_flow_rate
-      }
-      if(scmID %in% db_datex$dds$scmID){
-         scm_stats <- db_datex$dds[db_datex$dds$scmID == scmID,]
-         gardenarea <- 10  #see Walsh and Fletcher 2014 for uncertainty (and irrelevance) around this
-         max_filter_flow_rate.L.h <- (x$imp_carea + 50) * max_filter_flow_rate
-         #for downpipe diverters, doesn't really matter because they are standard estimates, but this will be typical
-      }
-       Rmtab <- data.table::data.table(
-              data.frame(V_ui = runoffData$daily$runoff_mm*x$imp_carea,
-                        out = x$budget$out,
-                        over = x$budget$overflow))
-    Rmtab$too_much_out <- Rmtab$out
-    Rmtab$too_much_out[Rmtab$out <= max_filter_flow_rate.L.h*24] <- 0
-    #FVm filtered volume through the SCMs via out
-    F_m_out <- sum(Rmtab$out[Rmtab$out <= max_filter_flow_rate.L.h*24])
-    }
-  if(scmID %in% raingardens$scmID){
-    if(scmID %in% db_datex$raingardens$scmID){
-      scm_stats <- db_datex$raingardens[db_datex$raingardens$scmID == scmID,]
-      gardenarea <- scm_stats$Af
-    }
-    max_filter_flow_rate.L.h <- (x$imp_carea + gardenarea) * max_filter_flow_rate
-    Rmtab <- data.table::data.table(data.frame(
-                        date = runoffData$hourly$date,
-                        V_ui = runoffData$hourly$runoff_mm*x$imp_carea,
-                        out = x$hourly_budget$out,
-                        over = x$hourly_budget$overflow))
-    Rmtab$too_much_out <- Rmtab$out
-    Rmtab$too_much_out[Rmtab$out <= max_filter_flow_rate.L.h & Rmtab$over == 0] <- 0
-    Rmtab <- Rmtab[, lapply(.SD, sum, na.rm=TRUE), by=date, .SDcols=c("V_ui","out","over","too_much_out") ]
-    #FVm filtered volume through the SCMs via out
-    F_m_out <- sum(Rmtab$out - Rmtab$too_much_out)
-  }
-    ### It is possible in treatment trains for overflow to continue into the next day because of routing delay
-    ### This will be in the first hour of the next day. To avoid infinite Rm value, move any such delayed overflows
-    ### into the previous day
-    delayed_over_days <- which(Rmtab$over > 0 & Rmtab$V_ui == 0)
-    if(length(delayed_over_days) > 0){
-      for(i in 1:length(delayed_over_days)){
-        Rmtab$over[delayed_over_days[i] - 1] <- Rmtab$over[delayed_over_days[i] - 1] + Rmtab$over[delayed_over_days[i]]
-        Rmtab$over[delayed_over_days[i]] <- 0
-      }
-    }
-    #Number of days of impervious runoff either untreated or filtered, but above the threshold 'base'flow
-    Rmtab$V_oi <- (Rmtab$too_much_out + Rmtab$over)
-    Rmtab$R_mi <- Rmtab$V_oi/Rmtab$V_ui
-    Rmtab$R_mi[is.na(Rmtab$R_mi) | Rmtab$V_ui == 0] <- 0
-    #R_mb is the binary version of Rm (see equations in Foundation paper) -used in EB calculator, but not in the paper 
-    R_mb <- sum((Rmtab$V_oi) > 0)
-    #R_m is the proportional version of Rm used in the Foundation paper
-    R_m <- sum(Rmtab$R_mi)
-    R_u <- sum(runoffData$daily$runoff_mm > 0) #121 Number of days of runoff from impervious surfaces
-    
-### 1. Runoff frequency index, RO
-    RO <- (1 - max((R_m - R_n)/(R_u - R_n), 0)) * x$imp_carea/100
-    RO_binary <- (1 - max((R_mb - R_n)/(R_u - R_n), 0)) * x$imp_carea/100
-
-### 2. Volume reduction index, VR
-    # Theoretical streamflow coefficients for forested and pasture catchments
-    mean.annrain.mm <- sum(runoffData$daily$rain_mm)
-    Zhang.forest.ro <- 1 - (1 + 2820/mean.annrain.mm)/(1 + 2820/mean.annrain.mm + mean.annrain.mm/1410)
-    Zhang.pasture.ro <- 1 - (1 + 550/mean.annrain.mm)/(1 + 550/mean.annrain.mm + mean.annrain.mm/1100)
-    # if there is less in the SCMs at the end than in the beginning, 
-    # ignore this difference i.e. if system is fuller at end of run
-    # than at start, then don't include the difference as lost (i.e. used and 
-    # fallen during the period) water. If it is emptier and the difference is 
-    # greater than the runoff from the SCM, then don't adjust for the difference
-    delstore <- max(0, max(0, sum(x$start_stores$store) - sum(x$end_stores$store)))
-    delstore <- ifelse(delstore > sum(c(x$budget$out,x$budget$overflow,x$budget$exf)) + 
-                         sum(x$leak_fates$exf),0,delstore)
-    #tank/rg start volume = store[1] + use[1] + exf[1] + et[1]
-    V_m <- sum(c(x$budget$out,x$budget$overflow,x$budget$exf)) - 
-               sum(x$leak_fates$et) - delstore  #sum(totLostVol)
-    V_u <- sum(Rmtab$V_ui) 
-    V_n <- x$imp_carea * Zhang.forest.ro * mean.annrain.mm
-    VR <- (1 - max((V_m - V_n)/(V_u - V_n), 0)) * x$imp_carea/100
-    if(reward.overextraction) {
-    # thus possible for a specific SCM to score VR > max EB: useful if using the  
-    # EB index to value projects and aiming for catchment-wide volume reduction, 
-    # but not able to achieve it in all SCMs.
-      VR <- (1 - (V_m - V_n)/(V_u - V_n)) * x$imp_carea/100
-        }
-
-### 3. Filtered flow volume index, FV
-      # filtered flows = upstream leaks to stormwater or exf (see above where they are partitioned into exf and out) + 
-      #                  upstream exf + 
-      #                  upstream out that is less than max_filter_flow_rate (F_m_out, calculated above)
-      # (all compiled in budget_scm_on_datex())
-      F_m <-  F_m_out + sum(x$budget$exf) - sum(x$leak_fates$et)
-      # impervious runoff minus runoff from mature forest according to Zhang curve.
-      F_pasture <- Zhang.pasture.ro * (x$imp_carea + gardenarea) * mean.annrain.mm
-      F_forest <- Zhang.forest.ro * (x$imp_carea + gardenarea) * mean.annrain.mm
-
-      if (F_m < F_forest) {
-          FV <- (F_m/F_forest) * x$imp_carea / 100
-          } else {
-      if (F_m > F_pasture) {
-          FV <- max(0, 1 - (F_m - F_pasture)/F_forest) * x$imp_carea/100
-          } else {
-          FV <- x$imp_carea/100
-           }
-          }
-  if(override.FV_n & F_m > F_forest) 
-    FV <- x$imp_carea/100
-
-### 4. water-quality index, WQ
-      #WQ logic -
-  #1. if the system overflows more frequently than the specified percentile, or 
-  #   if it is a tank with an unfiltered leak that flows more frequently than 
-  #   the specified percentile, then concentration is as bad as inflow stormwater. 
-  #   (or if it is a downpipe diverter, then infiltration flows are assumed to 
-  #   be negligible compared to the remaining flows that are untreated stormwater)
-  #2. If not, and it is a tank with a filtered leak, a leak to soil, or no leak, 
-  #   then the system makes no contribution to pollutant concentrations at 
-  #   [percentile] flows, so set concentration to zero.
-  #3. If not and it is a raingarden then use [percentile] concout values
-      Nconc_u <- 2.2
-      Pconc_u <- 0.35
-      TSSconc_u <- 150
-      UnfilteredLeak <- FALSE
-      Enviss <- FALSE
-      #downpipe diverters (are useless)
-  if (db_datex$SCMs$type[db_datex$SCMs$scmID == scmID] == "dd") {
-    Nconc_m <- Nconc_u
-    Pconc_m <- Pconc_u
-    TSSconc_m <- TSSconc_u
-  }
-      #Tanks
-  if (db_datex$SCMs$type[db_datex$SCMs$scmID == scmID] == "tank") {
-    allus_scms <- allupstream(SCMs, scmID, "scmID")
-    # if the tank or one of the tanks upstream have a filtered leak 
-    # (assumes that if one is filtered all are - certainly true in our study)
-    # or if the tank overflows to land, assume treatment to natural levels
-    leaks_to <- tanks$leakTo[tanks$scmID %in% allus_scms]
-    leaks_to <- leaks_to[!is.na(leaks_to)]
-    if (length(leaks_to) > 0 & 
-       sum(c("land","garden","filtered to stormwater") %in% leaks_to) > 0) {
-      UnfilteredLeak <- FALSE
-      leakRate <- sum(tanks$leak.rate[tanks$scmID %in% allus_scms])
-      if("filtered to stormwater" %in% leaks_to)
-        Enviss <- TRUE
-    }else{
-        leakRate <- scm_stats$leak.rate
-      }
-    # if they have an unfiltered leak to stormwater
-    # or if they overflow more than percentile of the time (highly unlikely) 
-    # or have an unfiltered leak or don't leak at all
-  if((scm_stats$leakTo[scm_stats$scmID == scmID] == "stormwater" &
-      scm_stats$leak.rate > 0) | 
-     quantile(x$budget$overflow, probs = percentile/100) > 0 |
-     UnfilteredLeak | leakRate == 0){
-    Nconc_m <- Nconc_u
-    Pconc_m <- Pconc_u
-    TSSconc_m <- TSSconc_u
-     }else{
-    # if they have a filtered leak, assume treatment achieved by Enviss filters
-    # which was used in all such systems in our study.
-       if(Enviss){
-    Nconc_m <- Nconc_u * 0.21
-    Pconc_m <- Pconc_u * 0.33
-    TSSconc_m <- TSSconc_u * 0.04
-    }else{
-    # if they leak or overflow to land or garden, assume treatment to pre-urban
-    # concentrations
-    Nconc_m <- Nconc_n
-    Pconc_m <- Pconc_n
-    TSSconc_m <- TSSconc_n
-    }
-       }
-  }
-      #Raingardens
-  if(db_datex$SCMs$type[db_datex$SCMs$scmID == scmID] == "rg"){
-    #If it overflows more than 'percentile' of the time (highly unlikely)
-    if(quantile(x$budget$overflow, probs = percentile/100) > 0){
-      Nconc_m <- Nconc_u
-      Pconc_m <- Pconc_u
-      TSSconc_m <- TSSconc_u
-    }else{
-      #if it doesn't overflow too much, and if it has an underdrain that releases filtered flow
-     if(quantile(x$budget$overflow, probs = percentile/100) == 0  & 
-        sum(x$hourly_budget$out > 0)){
-    Nconc_m <- as.vector(quantile(x$hourly_budget$Nconcout,
-                              probs = percentile/100, na.rm = TRUE))
-    Pconc_m <- as.vector(quantile(x$hourly_budget$Pconcout,
-                              probs = percentile/100, na.rm = TRUE))
-    TSSconc_m <- as.vector(quantile(x$hourly_budget$TSSout,
-                              probs = percentile/100, na.rm = TRUE))
-     }else{
-       #if it doesn't overflow too much, and if it only loses water through exfiltration
-       Nconc_m <- 0
-       Pconc_m <- 0
-       TSSconc_m <- 0
-     }
-    }
-  }
-  WQ <- mean(c((1 - max(0, (Nconc_m - Nconc_n)/
-                        (Nconc_u - Nconc_n))) * x$imp_carea/100,
-             (1 - max(0, (Pconc_m - Pconc_n)/
-                        (Pconc_u - Pconc_n))) * x$imp_carea/100,
-             (1 - max(0, (TSSconc_m - TSSconc_n)/
-                          (TSSconc_u - TSSconc_n))) * x$imp_carea/100))
-  # arguably these urban values (2.2, 0.35 and 150) are the more appropriate conc for 75th %ile
-  # this index can potentially score < 1 (if N is added to the system)
-  
-  # # potential rounding error in VR 
-  EB_max <- x$imp_carea/100
-  if(VR < 0 & abs(VR) < EB_max*0.0005) VR <- 0
-  #If any more negative, potential error....
-  
- summary <- list("R_m" = R_m,"R_n" = R_n,"R_u" = R_u,"R_mb" = R_mb,
-                 "V_m" = V_m,"V_n" = V_n,"V_u" = V_u,
-                 "F_m" = F_m,"F_forest" = F_forest,"F_pasture" = F_pasture,"F_u" = 0,
-                 "Nconc_m" = Nconc_m,"Nconc_n" = Nconc_n,"Nconc_u" = Nconc_u,
-                 "Pconc_m" = Pconc_m,"Pconc_n" = Pconc_n,"Pconc_u" = Pconc_u,
-                 "TSSconc_m" = TSSconc_m,"TSSconc_n" = TSSconc_n,"TSSconc_u" = TSSconc_n,
-                 "RO" = RO,"RO_binary" = RO_binary,"VR" = VR,"FV" = FV,"WQ" = WQ, 
-                 "EB" = mean(c(RO,VR,FV,WQ)),
-                 "EB_old_calc" = mean(c(RO_binary,VR,FV,WQ)),
-                 "EB_max" = EB_max)
- return(summary)
-}
-
 # EB_subc_on_datex() ---------------------------------
 #' Calculate Environmental Benefit Index of all stormwater control measures (SCMs)
 #' in a subcatchment on a specified date, and resulting variants on effective
@@ -1720,6 +1720,15 @@ EB_subc_on_datex <- function(pipeID, datex,
   tia <- sum(db$parcels$roofAreaCon + db$parcels$paveAreaCon + 
                db$parcels$roofAreaUncon + db$parcels$paveAreaUncon)
   eia <- sum(db$parcels$roofAreaCon + db$parcels$paveAreaCon)  # connected IA ignoring SCMs
+  #If there are any large public SCMs (that capture runoff from whole subcatchments) in terminal_scms
+  # ensure there are no upstream SCMs listed as terminal_scms (e.g. tanks draining to land upstream)
+  PLs <- scmProjects[is.na(scmProjects$parcelID) & scmProjects$projectID %in% terminal_scms$projectID,]
+  if(dim(PLs)[1] > 0){
+    for(i in 1:dim(PLs)[1]){
+      pli_subcs <- allupstream(db$subcs, PLs$pipeID[i],"pipeID")
+      terminal_scms <- terminal_scms[!(terminal_scms$pipeID %in% pli_subcs & terminal_scms$projectID != PLs$projectID[i]),]
+    }
+  }
   if(dim(terminal_scms)[1] > 0){
     if(terminal_scms$pipeID[1] == pipeID){
       dbi <- db
@@ -1727,7 +1736,7 @@ EB_subc_on_datex <- function(pipeID, datex,
       dbi <- data_on_datex(terminal_scms$pipeID[1], datex)
     }
   x <- data.frame(scmID = terminal_scms$scmID[1], 
-             t(unlist(EB_scm_on_datex(terminal_scms$scmID[1], datex, runoffData))))  #, ...
+             t(unlist(EB_scm_on_datex(terminal_scms$scmID[1], datex, runoffData))))
   if(dim(terminal_scms)[1] > 1){
     for(i in 2:dim(terminal_scms)[1]){
       if(terminal_scms$pipeID[i] == pipeID){
@@ -1905,12 +1914,32 @@ EI_subc_time_series <- function(pipeID,
   for(i in 1:length(idates)){
     db <- data_on_datex(pipeID, idates[i] + days(1))
     if(i == 1){
-      terminal_scms <- db$SCMs$scmID[is.na(db$SCMs$nextds) | 
-                                       db$SCMs$nextds == "land"]
+      terminal_scms <- db$SCMs[is.na(db$SCMs$nextds) | 
+                                       db$SCMs$nextds == "land",]
+      #If there are any large public SCMs (that capture runoff from whole subcatchments) in terminal_scms
+      # ensure there are no upstream SCMs listed as terminal_scms (e.g. tanks draining to land upstream)
+      PLs <- scmProjects[is.na(scmProjects$parcelID) & scmProjects$projectID %in% terminal_scms$projectID,]
+      if(dim(PLs)[1] > 0){
+        for(j in 1:dim(PLs)[1]){
+          plj_subcs <- allupstream(db$subcs, PLs$pipeID[j],"pipeID")
+          terminal_scms <- terminal_scms[!(terminal_scms$pipeID %in% plj_subcs & terminal_scms$projectID != PLs$projectID[j]),]
+        }
+      }
+      terminal_scms <- terminal_scms$scmID
     }
     if(i > 1){
-      new_tcsms <- db$SCMs$scmID[is.na(db$SCMs$nextds) | 
-                                   db$SCMs$nextds == "land"]
+      new_tcsms <- db$SCMs[is.na(db$SCMs$nextds) | 
+                                   db$SCMs$nextds == "land",]
+      #If there are any large public SCMs (that capture runoff from whole subcatchments) in terminal_scms
+      # ensure there are no upstream SCMs listed as terminal_scms (e.g. tanks draining to land upstream)
+      PLs <- scmProjects[is.na(scmProjects$parcelID) & scmProjects$projectID %in% new_tcsms$projectID,]
+      if(dim(PLs)[1] > 0){
+        for(j in 1:dim(PLs)[1]){
+          plj_subcs <- allupstream(db$subcs, PLs$pipeID[j],"pipeID")
+          new_tcsms <- new_tcsms[!(new_tcsms$pipeID %in% plj_subcs & new_tcsms$projectID != PLs$projectID[j]),]
+        }
+      }
+      new_tcsms <- new_tcsms$scmID
       non_terms <- terminal_scms[!(terminal_scms %in% new_tcsms)]
       non_terms <- non_terms[!non_terms %in% non_term_dates$scmID]
       if(length(non_terms) > 0){
@@ -1959,14 +1988,14 @@ EI_subc_time_series <- function(pipeID,
     EBi <- data.table::data.table(EB_scm_time_series(terminal_scms[i], start_date, end, runoffData = runoffData))
     EBi_dates <- unique(c(EBi$date, end))
     for (j in 1:(length(EBi_dates) - 1)) {
-      iats[iats$date >= EBi_dates[j] & 
-          iats$date < ifelse(EBi_dates[j + 1] == fin_date, EBi_dates[j + 1] + lubridate::days(1), EBi_dates[j + 1]),
+      endj <- as.Date(as.numeric(ifelse(EBi_dates[j + 1] == fin_date, 
+                                        EBi_dates[j + 1] + lubridate::days(1), 
+                                        EBi_dates[j + 1])), origin = lubridate::origin)
+      iats[iats$date >= EBi_dates[j] & iats$date < endj,
            c("s","ro","vr","fv","wq","eb")] <- 
-        iats[iats$date >= EBi_dates[j] & 
-             iats$date < ifelse(EBi_dates[j + 1] == fin_date, EBi_dates[j + 1] + lubridate::days(1), EBi_dates[j + 1]),
+        iats[iats$date >= EBi_dates[j] & iats$date < endj, 
              c("s","ro","vr","fv","wq","eb")] - 
-        EBi[rep(j,sum(iats$date >= EBi_dates[j] & 
-            iats$date < ifelse(EBi_dates[j + 1] == fin_date, EBi_dates[j + 1] + lubridate::days(1), EBi_dates[j + 1]))),
+        EBi[rep(j,sum(iats$date >= EBi_dates[j] & iats$date < endj)),
             c("EB_max","RO","VR","FV","WQ","EB")] * 100
       # * 100 because the original EB score was scaled to 100 m2, this converts EB unit to m
     }
@@ -2130,12 +2159,32 @@ budget_subc_time_series <- function(pipeID, runoffData){
   for(i in 1:length(idates)){
     db <- data_on_datex(pipeID, idates[i] + days(1))
     if(i == 1){
-      terminal_scms <- db$SCMs$scmID[is.na(db$SCMs$nextds) | 
-                                       db$SCMs$nextds == "land"]
+      terminal_scms <- db$SCMs[is.na(db$SCMs$nextds) | 
+                                       db$SCMs$nextds == "land",]
+      #If there are any large public SCMs (that capture runoff from whole subcatchments) in terminal_scms
+      # ensure there are no upstream SCMs listed as terminal_scms (e.g. tanks draining to land upstream)
+      PLs <- scmProjects[is.na(scmProjects$parcelID) & scmProjects$projectID %in% terminal_scms$projectID,]
+      if(dim(PLs)[1] > 0){
+        for(j in 1:dim(PLs)[1]){
+          plj_subcs <- allupstream(db$subcs, PLs$pipeID[j],"pipeID")
+          terminal_scms <- terminal_scms[!(terminal_scms$pipeID %in% plj_subcs & terminal_scms$projectID != PLs$projectID[j]),]
+        }
+      }
+      terminal_scms <- terminal_scms$scmID
     }
     if(i > 1){
-      new_tcsms <- db$SCMs$scmID[is.na(db$SCMs$nextds) | 
-                                   db$SCMs$nextds == "land"]
+      new_tcsms <- db$SCMs[is.na(db$SCMs$nextds) | 
+                                   db$SCMs$nextds == "land",]
+      #If there are any large public SCMs (that capture runoff from whole subcatchments) in terminal_scms
+      # ensure there are no upstream SCMs listed as terminal_scms (e.g. tanks draining to land upstream)
+      PLs <- scmProjects[is.na(scmProjects$parcelID) & scmProjects$projectID %in% new_tcsms$projectID,]
+      if(dim(PLs)[1] > 0){
+        for(j in 1:dim(PLs)[1]){
+          plj_subcs <- allupstream(db$subcs, PLs$pipeID[j],"pipeID")
+          new_tcsms <- new_tcsms[!(new_tcsms$pipeID %in% plj_subcs & new_tcsms$projectID != PLs$projectID[j]),]
+        }
+      }
+      new_tcsms <- new_tcsms$scmID
       non_terms <- terminal_scms[!(terminal_scms %in% new_tcsms)]
       non_terms <- non_terms[!non_terms %in% non_term_dates$scmID]
       if(length(non_terms) > 0){
