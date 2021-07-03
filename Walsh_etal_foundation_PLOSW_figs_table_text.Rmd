@@ -31,9 +31,9 @@ cat_stats <- data.frame(pipeID = c(101,103,53,36,74,71),
                         cat = c("D4","D8","Ln","Ls","L1","L4"),
                         n_scms = NA,
                         n_scm_projects = NA,
-                        eia_s1_ha = round(1e-4 * ei_fin$ei * ei_fin$carea,1),
+                        eia_s1_ha = round(1e-4 * final_stats$EI * ei_fin$carea,1),
                         ia_treated_ha = round(1e-4 * ei_fin$carea * (final_stats$EI - final_stats$EI_s),1),
-                        ia_treated_perc = round(100 * (ei_fin$ei - ei_fin$s) / ei_fin$ei,1),
+                        ia_treated_perc = round(100 * (final_stats$EI - final_stats$EI_s) / final_stats$EI,1),
                         vol_reduced_ML = round((final_stats$V_u - final_stats$V_m) * 1e-6),
                         vol_reduced_perc = round(100* (final_stats$V_u - final_stats$V_m) / final_stats$V_u,1),
                         vol_filtered_L = round(final_stats$F_m * 1e-6),
@@ -143,7 +143,7 @@ Water demand was enough to meet the volume reduction target of 55% in `r sum(lsc
 
 Fig. 1.  Examples of stream ecosystem response variables as a function of effective imperviousness (EI) as piecewise regressions (solid black line with 95% confidence intervals in the grey polygon as derived by @walsh_etal_2005a, compared to a linear regression against log$_{10}$(EI + 0.001), solid red line with dotted 95% confidence limits. a) Median filterable reactive phosphorus (FRP) concentrations and b) SIGNAL score (a biotic index). Five overlapping points in a) are shown by slight jittering.
 
-Fig. 2.  The 11 streamflow-gauging sites considered in this paper and their catchments, coloured by their status as control, experimental or reference. The 7 primary catchments of the original experiment are italicized. Impervious areas in each catchment are shaded by their connection to the stormwater drainage system. (Impervious areas outside catchments are not shown.)  Inset maps show the location of the main map (grey rectangle) in Victoria, Australia.  
+Fig. 2.  The 11 streamflow-gauging sites considered in this paper and their catchments, coloured by their status as control, experimental or reference. The 7 primary catchments of the original experiment are italicized. Impervious areas in each catchment are shaded by their connection to the stormwater drainage system in 2019. (Impervious areas outside catchments are not shown.)  Inset maps show the location of the main map (grey rectangle) in Victoria, Australia.  
 
 Fig. 3.  Stormwater control spread and effectiveness in each of the 6 experimental sub-catchments. A. Number of SCM projects per ha of effective impervious area (EIA).  B. Percentage of EIA that drains to at least one SCM. C.Percentage of impervious runoff filtered through SCMs or to soil.  D. Percentage of impervious runoff harvested or lost to evapo-transpiration in SCMs. In C and D, the pink polygons indicate the target percentages proposed by Walsh et al. (2012).  D8 and L4 bars are shaded to indicate that these sub-catchments contain other sub-catchments. D4 is part of D8, and L1, Ln and Ls are part of L4: see Fig. 1.  
 
