@@ -455,7 +455,7 @@ data_on_datex <- function(pipeID, datex){
     parcelsx$roofAreaCon[uncon_index] <- 0
     parcelsx$paveAreaCon[uncon_index] <- 0
   }
-  pcx_connections <- pcx[pcx$changeType == "connection" & pcx$date != "2006-06-01",]
+  pcx_connections <- pcx[pcx$changeType == "connection",]
   if(dim(pcx_connections)[1] > 0){
     iax$conn[iax$polyID %in% pcx_connections$polyID] <- 1
   }
