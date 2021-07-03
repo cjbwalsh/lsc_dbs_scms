@@ -69,6 +69,13 @@ ia$subc[ia$subc == "LIS0004H"] <- "LIS0004"
 # on of our SCMs. This is accounted for in EI variant calculations. For 
 # representation of impervious coverage, leave it in its original state.
 ia$subc[ia$subc == "BaileyRd"] <- "LIS0004"  
+#update ia polygons' connection status to that at end of the study period
+db_2019 <- data_on_datex(71, "2019-12-01")
+db_2019$ia <- db_2019$ia[db_2019$ia$polyID %in% ia$polyID,]
+for(i in 1:length(db_2019$ia$polyID)){
+  if(ia$conn[ia$polyID == db_2019$ia$polyID[i]] != db_2019$ia$conn[i])
+    ia$conn[ia$polyID == db_2019$ia$polyID[i]] <- db_2019$ia$conn[i]
+}
 # The manually drawn subc boundaries for DBS are not an exact match to the 
 # cat polygons derived from the DEM.  As a result, slight differences in 
 # catchment area estimates. Make consistent for EI calculations.
@@ -103,8 +110,8 @@ siteMap11$col <- catMap11$col[match(siteMap11$sitecode, catMap11$sitecode)]
 #                                   EB_subc_on_datex(74, as.Date("2019-12-31"))[-1]),
 #                        data.frame(site = "LIS0004",
 #                                   EB_subc_on_datex(71, as.Date("2019-12-31"))[-1]))
-# })  #~21 minutes
-#  save(final_stats, file = "data/final_stats.rda", compress = "xz")
+# })  #1.2 hours
+#   save(final_stats, file = "data/final_stats.rda", compress = "xz")
 
 load("data/final_stats.rda")
 
