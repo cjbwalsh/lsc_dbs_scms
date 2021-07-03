@@ -220,7 +220,7 @@ sim_set_mod <- stan(file = "code/sim_set_vary_t.stan",
                     data = data_list, chains = nChains, iter = nIter,
                     warmup = nWarmup, save_warmup = FALSE,
                     pars =  pars_to_sample,
-                    control = list(adapt_delta = 0.995, max_treedepth = 15),
+                    control = list(adapt_delta = 0.998, max_treedepth = 15),
                     seed = -237947234 ) # ~ 1.5 min to run 
 sim_set$non_auto_resids <- sim_set$y1 -  
   as.data.frame(summary(sim_set_mod, pars = "y_pred", probs = c(0.5), 
@@ -255,7 +255,7 @@ sim_set_mod_auto_t <- stan(file = "code/sim_set_vary_t_auto_t.stan",
                     data = data_list, chains = nChains, iter = nIter,
                     warmup = nWarmup, save_warmup = FALSE,
                     pars =  pars_to_sample,
-                    control = list(adapt_delta = 0.995, max_treedepth = 15),
+                    control = list(adapt_delta = 0.998, max_treedepth = 15),
                     seed = -237947234 )  #~5 min to run
 save(sim_set_mod_auto_t, file = paste0("data/sim_set_mod_auto_t_",
                                        ifelse(i == 1, "y1", "y"), ".rda"), 
@@ -268,25 +268,25 @@ if (i == 1) remove(sim_set_mod_auto_t)
 source("code/stan_utility.R")
 mt_summary <- as.data.frame(summary(sim_set_mod_auto_t)$summary)
 #Rhat for all parameters should be <1.1
-max(mt_summary$Rhat)  # y model 1.004, y1 model 1.001
+max(mt_summary$Rhat)  # y model 1.004, y1 model 1.003
 #Bulk effective sample size should be >100 x number of chains (https://mc-stan.org/misc/warnings.html#Bulk_ESS)
 mon <- as.data.frame(monitor(sim_set_mod_auto_t))
-min(mon$Bulk_ESS)/nChains # y model 282.5, y1 model 226 (y1 without auto_t 197)
+min(mon$Bulk_ESS)/nChains # y model 246.25, y1 model 246 (y1 without auto_t 197)
 row.names(mon[which.min(mon$Bulk_ESS),]) #(for parameter lp__)
 #Tail effective sample size, same requirement as for Bulk_ESS
-min(mon$Tail_ESS)/nChains # y model 227, y1 model 233 (y1 without auto_t 209.3), 
+min(mon$Tail_ESS)/nChains # y model 211.75, y1 model 187.25 (y1 without auto_t 209.3), 
 row.names(mon)[which.min(mon$Tail_ESS)] #(for parameter lp__
 #Tree depth should not have been saturated in any iterations: should be 0%
 check_treedepth(sim_set_mod_auto_t, max_depth = 15)  #y model 0%, y1 models 0%
 #Energy Bayesian Fraction of Missing Information should be >= 0.2 in all chains
 get_bfmi(sim_set_mod_auto_t)
-# y model, 0.3876457 0.4275368 0.4699209 0.4066458
-# y1 model, 0.4105023 0.4088967 0.4141952 0.4036192 (similar without auto_t)
+# y model, 0.4108265 0.3798480 0.3764679 0.5247351
+# y1 model, 0.4078153 0.3874838 0.3668600 0.4149168 (similar without auto_t)
 #Number of iterations ending in a divergence should be 0
-check_div(sim_set_mod_auto_t) #  y model 1 (0.00625%), y1 model zero
+check_div(sim_set_mod_auto_t) #  y model 1 (0.00625%), y1 model also 1
 #Visual checks of traceplots and...conducted using shinystan()
 #shinystan::launch_shinystan(sim_set_mod_auto_t)
-# despite one divergent transition, the traces look fine, 
+# despite one divergent transition in each model, the traces look fine, 
 # and coefficient distributions seem unchanged for many different runs of the 
 # model (with diff seeds), so this one transition is unimportant.
 ```
@@ -358,8 +358,9 @@ for (i in 1:N) log_lik[i] = normal_lpdf(y[i] | (beta_intercept +
 
 ```
 
-The Stan model with a temporal autocorrelation term (sim_set_vary_t_auto_t.stan).  
 
+The Stan model with a temporal autocorrelation term (sim_set_vary_t_auto_t.stan).   
+  
 ```{stan output.var = "sim_set_vary_t_auto_t.stan", eval=FALSE}
 data {
 int<lower=1> N;     // number of data points
