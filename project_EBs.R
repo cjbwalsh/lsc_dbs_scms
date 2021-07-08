@@ -1,3 +1,7 @@
+# This script calculates performance metrics for all stormwater control measures
+# in the project and was used to compile data/scmProjects_EB.rda
+# It takes > 1 h to run
+
 source(here::here("load_ld_scms_tables.R"))
 
 scmProjects$term_scm_1 <- NA
