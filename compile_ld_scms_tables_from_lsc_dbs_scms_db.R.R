@@ -38,7 +38,7 @@ parcels$nextds[!is.na(parcels$nextds) & parcels$nextds == nds[i]] <- parcels$par
 parcels <- parcels[!names(parcels) %in% c("address","streetNo","streetSuff",
                                           "streetName","streetType","JKroofArea","JKpaveArea")]
 parcels <- parcels[c("parcelID","nextds","pipeID","parcelType","roofAreaCon",
-                     "roofAreaUncon","paveAreaCon","paveAreaUncon","parcelArea","area_m2","geometry" )]
+                     "roofAreaUncon","paveAreaCon","paveAreaUncon","area_m2","geometry" )]
 ia <- ia[names(ia) != "address"]
 parcelChanges <- parcelChanges[names(parcelChanges) != "address"]
 scmProjects <- scmProjects[!names(scmProjects) %in% c("address","costProject","costGovt","costOwner")]

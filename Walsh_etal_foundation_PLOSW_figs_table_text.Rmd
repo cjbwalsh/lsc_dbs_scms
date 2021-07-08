@@ -157,7 +157,7 @@ Fig. 6. Results from the hierarchical linear model of two simulated response var
 ##### page break
 
 ```{r fig1_frp_v_ei, warning=FALSE, message=FALSE, fig.width = 7.48, fig.height = 3.5}
-#pdf("images/Fig1_frp_signal.pdf", width = 7.48, height = 3.5)
+#pdf("images/Fig 1.pdf", width = 7.48, height = 3.5)
 layout(matrix(c(1,2,3,3), 2, 2, byrow = TRUE), heights = c(10,1), widths = c(10,10))
 par(mar = c(2,4,1,1))
 #data used by Walsh et al 2005 taken from "SUSE NABS issue/FRP stats/data.txt"
@@ -236,7 +236,7 @@ Fig. 1.
 
 ```{r fig2_sitemap, warning=FALSE, message=FALSE, fig.width=7.48, fig.height=9.62, dev = "png",dpi = 300}
 dpi <- 300
-#png("images/fig_sitemap.png",res = dpi, width = 7.48*dpi, height = 9.62*dpi)
+#png("images/Fig 2.png",res = dpi, width = 7.48*dpi, height = 9.62*dpi)
 lo <- layout(matrix(c(1,2,1,3,1,4,1,5,1,6),5,2,byrow=TRUE),widths = c(5.75,1.25), 
        heights = c(1.25,1.25,4,1.25,1.25))
 par(mar = c(0,0,0,0))
@@ -321,7 +321,7 @@ Zhang.forest.filt.prop <- Zhang.forest.ro / 0.791
 Zhang.pasture.filt.prop <- Zhang.pasture.ro / 0.791
 scm_per_eia <- cat_stats$n_scm_projects/cat_stats$eia_s1_ha
 
-#pdf("images/Fig3_effectiveness.pdf", width = 6, height = 5)
+#pdf("images/Fig 3.pdf", width = 6, height = 5)
 layout(matrix(c(1:5,5), 3,2, byrow = TRUE), heights = c(10,12,1), widths = c(12,12))
 par(mar = c(1,4,1,1))
 barplot(scm_per_eia , ylim = c(0,20), las = 1, 
@@ -354,7 +354,7 @@ Fig. 3.
 
 
 ```{r fig4_MonitoringSiteTrendsA, results="hide", warning = FALSE, echo = FALSE, fig.width = 7, fig.height = 4}
-#pdf("images/Fig4_site_trends.pdf", width = 7, height = 4)
+#pdf("images/Fig 4.pdf", width = 7, height = 4)
 layout(matrix(c(1,2,3,4,1,5,6,7,0,8,8,8),3,4,byrow = TRUE),heights= c(10,10,1),widths = c(1,10,10,10))
 par(mar = c(0,0,0,0))
 plot.new()
@@ -403,7 +403,7 @@ line_cols <- siteMap11$col
 line_cols[match(c("LIS0001","DBS0008","DBS0004","LIS0004","LSS0001","LSN0001"), siteMap11$sitecode)] <-  
   RColorBrewer::brewer.pal(7,"YlOrRd")[2:7]
  
-#pdf("images/Fig5_ES1_delES.pdf", width = 7, height = 2.5)
+#pdf("images/Fig 5.pdf", width = 7, height = 2.5)
 layout(matrix(c(1,2,3,4,4,4), ncol=3, byrow=TRUE), heights = c(10,1), widths = c(10,10,10))
 par(mar=c(2,4,1,1))
 
@@ -459,7 +459,7 @@ Fig. 5
 # Code for producing Fig 6 is the final chunk in 'Walsh_et_al_foundation_PLOSW_S5.Rmd'
 # The code requires compiling of the Stan model objects (earlier chunks in that
 # document), which takes ~ 1 h. Hence printed as a pdf here.
-knitr::include_graphics("images/walsh_etal_foundation_fig6.pdf")
+knitr::include_graphics("images/Fig 6.pdf")
 ```
 Fig. 6
 

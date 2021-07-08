@@ -3,9 +3,13 @@
 .RData
 .Ruserdata
 scratch.R
+images/Fig *.pdf
+images/Fig2.png
+code/stan_utility.R
 *.rds
 *.docx
 !officedown_template.docx
 data/*.gpkg
 data/lsc_rain_hourly.rda
+data/sim_set_mod*.rda
 

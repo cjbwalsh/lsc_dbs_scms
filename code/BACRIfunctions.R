@@ -399,22 +399,22 @@ data_on_datex <- function(pipeID, datex){
       iax <- rbind(iax[names(iax) != "subc"], polyi)
       if(polyi$parcType == "property"){
       parcelsx$roofAreaCon[parcelsx$parcelID == polyi$parcelID] <- 
-        min(parcelsx$parcelArea[parcelsx$parcelID == polyi$parcelID], 
+        min(parcelsx$area_m2[parcelsx$parcelID == polyi$parcelID], 
             parcelsx$roofAreaCon[parcelsx$parcelID == polyi$parcelID] + 
         polyi$conn * polyi$area_m2)
       if(polyi$conn == 0)
         parcelsx$roofAreaUncon[parcelsx$parcelID == polyi$parcelID] <- 
-          min(parcelsx$parcelArea[parcelsx$parcelID == polyi$parcelID], 
+          min(parcelsx$area_m2[parcelsx$parcelID == polyi$parcelID], 
               parcelsx$roofAreaUnCon[parcelsx$parcelID == polyi$parcelID] + 
           polyi$area_m2)
       }else{
         parcelsx$paveAreaCon[parcelsx$parcelID == polyi$parcelID] <- 
-          min(parcelsx$parcelArea[parcelsx$parcelID == polyi$parcelID], 
+          min(parcelsx$area_m2[parcelsx$parcelID == polyi$parcelID], 
               parcelsx$paveAreaCon[parcelsx$parcelID == polyi$parcelID] + 
                 polyi$conn * polyi$area_m2)
         if(polyi$conn == 0)
           parcelsx$paveAreaUncon[parcelsx$parcelID == polyi$parcelID] <- 
-            min(parcelsx$parcelArea[parcelsx$parcelID == polyi$parcelID], 
+            min(parcelsx$area_m2[parcelsx$parcelID == polyi$parcelID], 
                 parcelsx$paveAreaUnCon[parcelsx$parcelID == polyi$parcelID] + 
                   polyi$area_m2)
       }
@@ -434,11 +434,11 @@ data_on_datex <- function(pipeID, datex){
                   pcx_demolitions$area_m2[i])
       }else{
         parcelsx$paveAreaCon[parcelsx$parcelID == pcx_demolitions$parcelID[i]] <- 
-          max(0,parcelArea, parcelsx$paveAreaCon[parcelsx$parcelID == pcx_demolitions$parcelID[i]] - 
+          max(0,parcelsx$area_m2, parcelsx$paveAreaCon[parcelsx$parcelID == pcx_demolitions$parcelID[i]] - 
                 pcx_demolitions$conn[i] * pcx_demolitions$area_m2[i])
         if(pcx_demolitions$conn[i] == 0)
           parcelsx$paveAreaUncon[parcelsx$parcelID == pcx_demolitions$parcelID[i]] <- 
-            max(0,parcelArea, parcelsx$paveAreaUnCon[parcelsx$parcelID == pcx_demolitions$parcelID[i]] - 
+            max(0,area_m2, parcelsx$paveAreaUnCon[parcelsx$parcelID == pcx_demolitions$parcelID[i]] - 
                   pcx_demolitions$area_m2[i])
       }
     }
