@@ -4,7 +4,7 @@
 # These instructions should work on Linux and Mac OSX (not tested on Windows), 
 # if the github repository has been cloned to the working computer,
 # followed by running the following line from the lsc_dbs_scms directory
-## source("load_ld_scms_tables.R").
+## source("load_ld_scms_tables.R").  
 # See load_ld_scms_tables.R for instructions on cloning the github repository.
 
 # Walsh, C. J., Burns, M. J., Fletcher, T. D., Bos, D. G., Kunapo, J., Poelsma, P., & Imberger, S. J. (2021), 

@@ -2,9 +2,10 @@
 .Rhistory
 .RData
 .Ruserdata
+*.Rproj
 scratch.R
 images/Fig *.pdf
-images/Fig2.png
+images/Fig 2.png
 code/stan_utility.R
 *.rds
 *.docx
