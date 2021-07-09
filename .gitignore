@@ -5,7 +5,7 @@
 *.Rproj
 scratch.R
 images/Fig *.pdf
-images/Fig 2.png
+images/Fig *.tiff
 code/stan_utility.R
 *.rds
 *.docx
