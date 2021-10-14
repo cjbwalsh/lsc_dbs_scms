@@ -136,7 +136,7 @@ mod_y1 <- map2stan(alist(y ~ dnorm(mu, sigma),
                            a_t_sigma ~ dcauchy(0,2), #dexp(1),  #
                            b_t[siteno] ~ dnorm(0,5),
                            sigma ~ dcauchy(0,2)), #dexp(1)),    #
-                     data=d, iter=5000, warmup = 2000, 
+                     data=d, iter=5000, warmup = 2000, log_lik=TRUE,
                      cores = 4, chains = nChains, rng_seed = current.seed)
 
 #Calculate t_auto from residual estimates from model without auto_t
