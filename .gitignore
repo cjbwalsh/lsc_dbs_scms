@@ -13,4 +13,6 @@ code/stan_utility.R
 data/*.gpkg
 data/lsc_rain_hourly.rda
 data/sim_set_mod*.rda
+code/S5_map.R
+code/sim_set_vary_map2stan.R
 
