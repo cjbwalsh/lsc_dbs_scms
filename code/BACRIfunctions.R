@@ -328,9 +328,9 @@ data_on_datex <- function(pipeID, datex){
   #1. Change subc network structure if King St Upper or the Entrance were operational and relevant.
     subcsx <- subcs; kingst <- theentrance <- FALSE
   if(pipeID %in% unique(c(alldownstream(subcs, 30, "pipeID"),alldownstream(subcs, 31, "pipeID"),75)) & 
-     (datex >= "2016-07-15" & datex < "2016-10-14") | #commissioning to first taking offline
+     ((datex >= "2016-07-15" & datex < "2016-10-14") | #commissioning to first taking offline
      (datex >= "2017-03-17" & datex < "2017-09-15") | #First erosion problems fixed
-     (datex >= "2018-02-05" & datex < "2019-06-02")){ #Second erosion problems addressed
+     (datex >= "2018-02-05" & datex < "2019-06-02"))){ #Second erosion problems addressed
      #dates from email from Patrick Jeschke 8 March 2018 (King St system turned off for some months to address flooding concerns)
      #finally taken offline ~2 June 2019 - see email from Patrick 6 June 2019 forwarded by Darren Bos 7 June 2019.
     subcsx$nextds[subcsx$pipeID == 75] <- 30
@@ -385,14 +385,14 @@ data_on_datex <- function(pipeID, datex){
     #sf::st_geometry(iax) <- NULL
     for(i in 1:dim(pcx_constructions)[1]){
       ##If you want spatial data including these additional polygons...
-      parci_centroid <- suppressWarnings(sf::st_centroid(parcelsx[parcelsx$parcelID == pcx$parcelID[i],]))
+      parci_centroid <- suppressWarnings(sf::st_centroid(parcelsx[parcelsx$parcelID == pcx_constructions$parcelID[i],]))
       polyi <- st_buffer(parci_centroid, dist = sqrt(pcx$area_m2[i]/pi))
       ##else
       polyi$polyID <- 20000 + i
-      polyi$conn <- pcx$conn[i]
-      polyi$area_m2 <- pcx$area_m2[i]
+      polyi$conn <- pcx_constructions$conn[i]
+      polyi$area_m2 <- pcx_constructions$area_m2[i]
       polyi$parcType <- polyi$parcelType
-      polyi$constructionDate <- pcx$date[i]
+      polyi$constructionDate <- pcx_constructions$date[i]
       polyi$surfType <- "roof" #almost always true. not important for ei calcs
       polyi <- polyi[c("polyID","pipeID","conn","nextds","area_m2",
                        "parcType","surfType","constructionDate","parcelID")] #see above if... #,"geometry")]
@@ -405,7 +405,7 @@ data_on_datex <- function(pipeID, datex){
       if(polyi$conn == 0)
         parcelsx$roofAreaUncon[parcelsx$parcelID == polyi$parcelID] <- 
           min(parcelsx$area_m2[parcelsx$parcelID == polyi$parcelID], 
-              parcelsx$roofAreaUnCon[parcelsx$parcelID == polyi$parcelID] + 
+              parcelsx$roofAreaUncon[parcelsx$parcelID == polyi$parcelID] + 
           polyi$area_m2)
       }else{
         parcelsx$paveAreaCon[parcelsx$parcelID == polyi$parcelID] <- 
